@@ -11,9 +11,10 @@ type Hospital = {
 };
 
 // Declare google as a global variable for TypeScript
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
 
-export default function MapComponent({ hospitals }: { hospitals: Hospital[] }) {
+export default function MapComponent({ hospitals: _hospitals }: { hospitals: Hospital[] }) {
   const mapRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -54,10 +55,12 @@ export default function MapComponent({ hospitals }: { hospitals: Hospital[] }) {
     script.src = `https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&callback=initMap&libraries=places`;
     script.async = true;
     script.defer = true;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).initMap = () => setMapLoaded(true);
     document.head.appendChild(script);
 
     return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (window as any).initMap;
       document.head.removeChild(script);
     };
@@ -97,6 +100,7 @@ export default function MapComponent({ hospitals }: { hospitals: Hospital[] }) {
         radius: 5000, // 5 km radius
         type: 'hospital',
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (results: any, status: any) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && results) {
           for (let i = 0; i < results.length; i++) {

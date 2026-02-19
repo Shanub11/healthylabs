@@ -48,7 +48,7 @@ function LoginPage() {
                     {loading ? 'Logging in...' : 'Login'}
                 </button>
             </form>
-            <p className="mt-4 text-white">Don't have an account? <a href="/Register" className="text-blue-200 hover:underline">Register</a></p>
+            <p className="mt-4 text-white">Don&apos;t have an account? <a href="/Register" className="text-blue-200 hover:underline">Register</a></p>
         </div>
     );
 }
