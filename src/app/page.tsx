@@ -1,103 +1,100 @@
-import Image from "next/image";
+// Import the necessary icons from lucide-react
+import { HeartPulse, MessageSquare, HandHeart, Search } from 'lucide-react';
+import Link from 'next/link';
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+// Main App Component
+const App = () => {
+    return (
+        <>
+            {/* In a real React application, you would place the Google Fonts link 
+              in the `public/index.html` file. The custom styles and keyframes 
+              would typically go into a separate CSS file (e.g., App.css) and be imported.
+              For this self-contained example, they are included directly.
+            */}
+            <style>{`
+                @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=Inter:wght@400;500&display=swap');
+                
+                body {
+                    font-family: 'Inter', sans-serif;
+                    background-color: #111827; /* bg-gray-900 */
+                    color: white;
+                    overflow: hidden;
+                }
+                .font-lora {
+                    font-family: 'Lora', serif;
+                }
+                .glass-blob {
+                    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+                    animation: morph 8s ease-in-out infinite;
+                    transition: all 1s ease-in-out;
+                }
+                @keyframes morph {
+                    0% {
+                        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+                    }
+                    50% {
+                        border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+                    }
+                    100% {
+                        border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+                    }
+                }
+            `}</style>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
-}
+            {/* Main container with gradient background */}
+            <div className="relative w-full h-screen flex items-center justify-center bg-gradient-to-br from-[#6f00ff] via-[#b600a3] to-[#71c562]">
+                
+                {/* Header Icons and Buttons */}
+                <header className="absolute top-0 left-0 w-full p-6 md:p-8 flex justify-between items-center z-20">
+                    {/* Left side icons */}
+                    <div className="flex items-center space-x-4">
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center">
+                            {/* Replaced with Lucide icon */}
+                            <HeartPulse className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center">
+                            {/* Replaced with Lucide icon */}
+                            <MessageSquare className="w-6 h-6 text-white" />
+                        </div>
+                    </div>
+                    
+                    {/* Right side icons and buttons */}
+                    <div className="flex items-center space-x-4">
+                         <div className="w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center">
+                            {/* Replaced with Lucide icon */}
+                            <HandHeart className="w-7 h-7 text-white" />
+                        </div>
+                        <Link href="Login" className="bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/30 transition-colors cursor-pointer">Login</Link>
+                        <Link href="Register" className="hidden sm:block bg-white/20 backdrop-blur-sm border border-white/30 rounded-full px-5 py-2.5 text-sm font-medium hover:bg-white/30 transition-colors cursor-pointer">Register</Link>
+                    </div>
+                </header>
+
+                {/* Main Content Area */}
+                <main className="relative w-full flex items-center justify-center">
+                    {/* Glassmorphism Blob */}
+                    <div className="glass-blob w-[90%] h-[45vh] sm:w-2/3 sm:h-[50vh] md:w-1/2 lg:w-[45%] lg:h-[50vh] bg-white/10 backdrop-blur-xl border-2 border-white/20 shadow-2xl flex items-center justify-center">
+                        <div className="text-center">
+                            <h1 className="font-lora text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium tracking-wide">Welcome to</h1>
+                            <h2 className="font-lora text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold tracking-wide mt-2">HealthyLabs.AI</h2>
+                        </div>
+                    </div>
+                </main>
+
+                {/* Bottom Search Bar */}
+                <footer className="absolute bottom-8 md:bottom-12 w-full flex justify-center z-20 px-4">
+                    <div className="flex items-center space-x-4 bg-black/20 backdrop-blur-sm border border-white/30 rounded-full px-4 py-3 md:px-6 md:py-4">
+                        <span className="text-2xl md:text-3xl font-light opacity-70">(</span>
+                        <div className="w-8 h-8 md:w-10 md:h-10 border-2 border-white/80 rounded-full flex items-center justify-center">
+                            {/* Replaced with Lucide icon */}
+                            <Search className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                        </div>
+                        <p className="text-sm md:text-base text-white/90 tracking-wide">Worry about your health? Ask me</p>
+                        <span className="text-2xl md:text-3xl font-light opacity-70">)</span>
+                    </div>
+                </footer>
+            </div>
+        </>
+    );
+};
+
+export default App;
