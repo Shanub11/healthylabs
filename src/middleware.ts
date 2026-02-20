@@ -33,8 +33,12 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  // If not logged in → block dashboard routes
-  if (!session && request.nextUrl.pathname.startsWith('/dashboard')) {
+  // Define paths that are accessible without authentication
+  const publicPaths = ['/', '/Login', '/Register'];
+  const isPublicPath = publicPaths.includes(request.nextUrl.pathname);
+
+  // If not logged in and trying to access a protected route
+  if (!session && !isPublicPath) {
     return NextResponse.redirect(new URL('/Login', request.url));
   }
 
@@ -42,5 +46,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };
