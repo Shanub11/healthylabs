@@ -1,11 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import fs from 'fs/promises';
-import path from 'path';
+// fs cannot be used for persistent storage on Vercel
+// import fs from 'fs/promises';
+// import path from 'path';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    // Verify Vercel Cron Secret to prevent unauthorized access
+    const authHeader = request.headers.get('authorization');
+    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
     const url = 'https://www.jeevandayee.gov.in/MJPJAY/FrontServlet?requestType=PublicViewsRH&actionVal=ViewBedInfoForDisease&City=x%20&Disease=-1&DataFlag=true&DfltHospList=Reports';
 
     // 1. Fetch the HTML
@@ -44,15 +51,18 @@ export async function GET() {
       throw new Error("No hospitals found. The website structure might have changed.");
     }
     
-    // 4. Save the data to a JSON file in the /public directory
-    const filePath = path.join(process.cwd(), 'public', 'hospital_data.json');
-    await fs.writeFile(filePath, JSON.stringify({
-      lastScraped: new Date().toISOString(),
-      hospitals: hospitals
-    }, null, 2));
+    // 4. Save the data
+    // NOTE: Writing to 'public/' does not persist on Vercel.
+    // You should insert 'hospitals' into your Supabase database here.
+    // const filePath = path.join(process.cwd(), 'public', 'hospital_data.json');
+    // await fs.writeFile(filePath, JSON.stringify({
+    //   lastScraped: new Date().toISOString(),
+    //   hospitals: hospitals
+    // }, null, 2));
 
     return NextResponse.json({
-      message: `Successfully scraped and saved data for ${hospitals.length} hospitals.`
+      message: `Successfully scraped ${hospitals.length} hospitals.`,
+      data: hospitals
     });
 
   } catch (error) {
