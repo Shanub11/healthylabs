@@ -37,8 +37,8 @@ export default function HealthyLabsHome() {
     { title: "Your Daily Dr.", icon: <Stethoscope className="h-6 w-6" />, color: "from-pink-400 to-pink-600" },
     { title: "Chat Freely", icon: <MessageSquare className="h-6 w-6" />, color: "from-purple-400 to-pink-500" },
     { title: "Hospitals", icon: <Hospital className="h-6 w-6" />, color: "from-rose-400 to-pink-600", path: "/Hospitals" },
-    { title: "Reports", icon: <Upload className="h-6 w-6" />, color: "from-fuchsia-400 to-pink-500" },
-    { title: "AI Analyzed Reports", icon: <Upload className="h-6 w-6" />, color: "from-pink-300 to-rose-500" },
+   
+    { title: "AI Analyzed Reports", icon: <Upload className="h-6 w-6" />, color: "from-pink-300 to-rose-500", path: "/analyze" },
     { title: "Pharma Section", icon: <Pill className="h-6 w-6" />, color: "from-purple-300 to-pink-500" },
     { title: "Your Personal Dr.", icon: <User className="h-6 w-6" />, color: "from-pink-500 to-rose-600" },
     { title: "Your Data", icon: <BarChart3 className="h-6 w-6" />, color: "from-pink-400 to-purple-500" },
@@ -109,7 +109,7 @@ export default function HealthyLabsHome() {
                 {sec.title === "Your Daily Dr." && "Get instant AI health advice daily."}
                 {sec.title === "Chat Freely" && "Talk openly with AI about your health."}
                 {sec.title === "Hospitals" && "Find nearby hospitals & availability."}
-                {sec.title === "Reports" && "View and manage all medical reports."}
+                
                 {sec.title === "AI Analyzed Reports" && "Upload scans, tests & get AI analysis."}
                 {sec.title === "Pharma Section" && "Search medicines & nearby pharmacies."}
                 {sec.title === "Your Personal Dr." && "Connect with your AI + real doctor."}

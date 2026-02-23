@@ -1,15 +1,7 @@
 {
   "lastScraped": "2026-02-20T05:41:24.539Z",
   "hospitals": [
-    {
-      "srNo": "S.No",
-      "name": "Hospital Name",
-      "city": "Location",
-      "totalBeds": 0,
-      "occupiedBeds": 0,
-      "availableBeds": 0,
-      "lastUpdated": "Total Beds available under the Scheme"
-    },
+    
     {
       "srNo": "1",
       "name": "INDRAVATI HOSPITAL & RESEARCH CENTRE",
