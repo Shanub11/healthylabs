@@ -177,6 +177,10 @@ def call_llm_analysis(text):
 
 # --- Endpoints ---
 
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "HealthyLabs API is running"}
+
 @app.post("/analyze-report")
 async def analyze_report(
     file: Optional[UploadFile] = File(None),
