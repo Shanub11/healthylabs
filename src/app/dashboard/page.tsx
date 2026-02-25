@@ -10,13 +10,28 @@ import { MessageSquare, Hospital, Upload, Pill, Stethoscope, BarChart3, User, Lo
 export default function HealthyLabsHome() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUser(session.user);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (session) {
+          setUser(session.user);
+        }
+        setIsOffline(false); // Connection successful
+      } catch (error) {
+        // Detect network errors to show offline banner
+        if (error instanceof Error && (error.message.includes('Failed to fetch') || error.message.includes('fetch failed'))) {
+          setIsOffline(true);
+        }
+
+        // Suppress "Failed to fetch" errors which are common in dev/network issues
+        if (error instanceof Error && !error.message.includes('Failed to fetch')) {
+          console.error("Error fetching session:", error);
+        }
       }
     };
     getUser();
@@ -39,20 +54,28 @@ export default function HealthyLabsHome() {
     { title: "Hospitals", icon: <Hospital className="h-6 w-6" />, color: "from-rose-400 to-pink-600", path: "/Hospitals" },
    
     { title: "AI Analyzed Reports", icon: <Upload className="h-6 w-6" />, color: "from-pink-300 to-rose-500", path: "/analyze" },
-    { title: "Pharma Section", icon: <Pill className="h-6 w-6" />, color: "from-purple-300 to-pink-500" },
-    { title: "Your Personal Dr.", icon: <User className="h-6 w-6" />, color: "from-pink-500 to-rose-600" },
+    { title: "Pharma Section", icon: <Pill className="h-6 w-6" />, color: "from-purple-300 to-pink-500", path: "/pharma" },
+    
     { title: "Your Data", icon: <BarChart3 className="h-6 w-6" />, color: "from-pink-400 to-purple-500" },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-200 via-purple-200 to-rose-200 flex flex-col items-center p-6 font-sans relative">
       
+      {/* Offline/Connection Error Banner */}
+      {isOffline && (
+        <div className="absolute top-0 left-0 w-full bg-red-500 text-white text-center py-2 px-4 z-[60] shadow-md animate-pulse">
+          ⚠️ <strong>Connection Error:</strong> Unable to reach Supabase. Please check your internet connection or project status.
+        </div>
+      )}
+
       {/* Profile Button (Top Right) */}
       <div className="absolute top-6 right-6 z-50">
         <div className="relative">
           <button 
             onClick={() => setMenuOpen(!menuOpen)} 
             className="flex cursor-pointer items-center space-x-2 bg-white/80 backdrop-blur-sm px-3 py-2 rounded-full shadow-sm hover:bg-white transition border border-pink-100"
+            suppressHydrationWarning
           >
             <div className="bg-pink-500 rounded-full p-1">
               <User className="w-4 h-4 text-white" />
@@ -90,6 +113,7 @@ export default function HealthyLabsHome() {
             type="text"
             placeholder="Worried about your health? Ask me…"
             className="px-4 py-3 w-80 rounded-2xl border text-black border-pink-300 shadow-sm focus:ring-2 focus:ring-pink-400 outline-none"
+            suppressHydrationWarning
           />
         </div>
       </div>
@@ -112,7 +136,7 @@ export default function HealthyLabsHome() {
                 
                 {sec.title === "AI Analyzed Reports" && "Upload scans, tests & get AI analysis."}
                 {sec.title === "Pharma Section" && "Search medicines & nearby pharmacies."}
-                {sec.title === "Your Personal Dr." && "Connect with your AI + real doctor."}
+                
                 {sec.title === "Your Data" && "Track your weekly health stats & insights."}
               </p>
             </div>
@@ -129,7 +153,7 @@ export default function HealthyLabsHome() {
       </div>
 
       {/* Footer */}
-      <footer className="mt-12 text-center text-gray-600 text-sm">
+      <footer className="mt-30 text-center text-gray-600 text-sm">
         <p>
           💖 Stay Healthy. Stay Happy. With{" "}
           <span className="text-pink-600 font-semibold">HealthyLabs.AI</span>

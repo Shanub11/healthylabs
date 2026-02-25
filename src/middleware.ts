@@ -1,6 +1,22 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
+// Suppress specific console errors from Supabase client to avoid noise in dev
+const originalConsoleError = console.error;
+console.error = (...args) => {
+  if (args.length > 0) {
+    const arg = args[0];
+    if (arg instanceof Error && (
+      arg.message.includes('fetch failed') ||
+      arg.message.includes('Failed to fetch') ||
+      arg.message.includes('AuthRetryableFetchError')
+    )) {
+      return;
+    }
+  }
+  originalConsoleError(...args);
+};
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -29,9 +45,16 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let session = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    session = data.session;
+  } catch (error) {
+    // Suppress fetch errors to prevent noise in dev console when network is unstable
+    if (error instanceof Error && !error.message.includes('fetch failed') && !error.message.includes('Failed to fetch')) {
+      console.error('Middleware session check failed:', error);
+    }
+  }
 
   // Define paths that are accessible without authentication
   const publicPaths = ['/', '/Login', '/Register'];

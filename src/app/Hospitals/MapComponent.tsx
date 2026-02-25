@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useState } from 'react';
 
 // Define types for our scraped data for better code quality
@@ -14,32 +12,10 @@ type Hospital = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const google: any;
 
-export default function MapComponent({ hospitals: _hospitals }: { hospitals: Hospital[] }) {
+export default function MapComponent({ hospitals: _hospitals, userLocation }: { hospitals: Hospital[], userLocation: { lat: number; lng: number } | null }) {
   const mapRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  // 1. Get user's current location
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          });
-          setError(null);
-        },
-        (err) => {
-          setError(`Geolocation failed: ${err.message}. Please enable location services.`);
-          console.error(err);
-        }
-      );
-    } else {
-      setError("Geolocation is not supported by this browser.");
-    }
-  }, []);
 
   // 2. Load the Google Maps script with the 'places' library
   useEffect(() => {

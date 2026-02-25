@@ -2,8 +2,8 @@ import { NextResponse, NextRequest } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 // fs cannot be used for persistent storage on Vercel
-// import fs from 'fs/promises';
-// import path from 'path';
+import fs from 'fs/promises';
+import path from 'path';
 
 export async function GET(request: NextRequest) {
   try {
@@ -54,11 +54,11 @@ export async function GET(request: NextRequest) {
     // 4. Save the data
     // NOTE: Writing to 'public/' does not persist on Vercel.
     // You should insert 'hospitals' into your Supabase database here.
-    // const filePath = path.join(process.cwd(), 'public', 'hospital_data.json');
-    // await fs.writeFile(filePath, JSON.stringify({
-    //   lastScraped: new Date().toISOString(),
-    //   hospitals: hospitals
-    // }, null, 2));
+    const filePath = path.join(process.cwd(), 'public', 'hospital_data.json');
+    await fs.writeFile(filePath, JSON.stringify({
+      lastScraped: new Date().toISOString(),
+      hospitals: hospitals
+    }, null, 2));
 
     return NextResponse.json({
       message: `Successfully scraped ${hospitals.length} hospitals.`,
