@@ -40,10 +40,28 @@ export default async function HospitalFinderPage() {
   });
 
   return (
-    <div className="container mx-auto px-4 py-8 bg-gray-50">
-      <div id="page-hospital-finder" className="page-content">
-        <HospitalFinderClient hospitals={hospitals} lastUpdatedTime={lastUpdatedTime} />
+    <>
+      <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&family=Inter:wght@400;500&display=swap');
+          
+          @keyframes float-slow {
+              0% { transform: translate(0px, 0px) scale(1); }
+              33% { transform: translate(30px, -50px) scale(1.1); }
+              66% { transform: translate(-20px, 20px) scale(0.9); }
+              100% { transform: translate(0px, 0px) scale(1); }
+          }
+          .animate-float-1 { animation: float-slow 8s ease-in-out infinite; }
+          .animate-float-2 { animation: float-slow 10s ease-in-out infinite reverse; }
+          .animate-float-3 { animation: float-slow 12s ease-in-out infinite 1s; }
+      `}</style>
+      <div className="relative min-h-screen bg-gradient-to-br from-[#cbe5ff] via-[#dcedff] to-[#e1f0ff] overflow-hidden font-sans">
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-white/60 rounded-full blur-[100px] animate-float-1 pointer-events-none"></div>
+        <div className="absolute top-[20%] right-[-5%] w-[400px] h-[400px] bg-blue-300/30 rounded-full blur-[80px] animate-float-2 pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] left-[20%] w-[600px] h-[600px] bg-cyan-200/40 rounded-full blur-[100px] animate-float-3 pointer-events-none"></div>
+        <div className="container mx-auto px-4 py-8 relative z-10">
+          <HospitalFinderClient hospitals={hospitals} lastUpdatedTime={lastUpdatedTime} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }

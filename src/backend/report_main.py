@@ -153,6 +153,7 @@ def call_llm_analysis(text):
     3. Suggest what patient should discuss with doctor
     4. DO NOT provide diagnosis
     5. Use layman-friendly wording
+    6. Do not use markdown symbols like #, *, or - for formatting. Use spacing and capitalization to structure the response clearly.
 
     Report:
     {text[:4000]} 

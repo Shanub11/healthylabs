@@ -60,7 +60,7 @@ const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
 function deg2rad(deg: number) {
   return deg * (Math.PI / 180);
 }
-
+` 1`
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);
@@ -140,33 +140,35 @@ export default function HospitalFinderClient({ hospitals, lastUpdatedTime }: { h
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col md:flex-row items-center justify-center relative">
-        <div className="self-start md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 mb-4 md:mb-0">
+      <div className="flex flex-col md:flex-row items-center justify-center relative mb-8">
+        <div className="self-start md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2 mb-4 md:mb-0 z-20">
           <Link 
             href="/dashboard" 
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+            className="flex items-center gap-2 px-5 py-2.5 text-slate-700 bg-white/60 backdrop-blur-md hover:bg-white/90 rounded-full transition-all font-medium border border-white/60 shadow-sm hover:shadow-md group"
           >
-            <Home className="w-5 h-5" />
+            <Home className="w-5 h-5 text-blue-500 group-hover:scale-110 transition-transform" />
             <span>Home</span>
           </Link>
         </div>
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-800">Real-time Hospital Finder</h1>
-          <p className="text-sm text-gray-500 mt-2">
+        <div className="text-center z-10">
+          <h1 className="text-4xl md:text-5xl font-lora font-bold text-slate-800 tracking-tight">
+            Real-time <span className="text-blue-600">Hospital Finder</span>
+          </h1>
+          <p className="text-slate-600 font-medium mt-3 bg-white/30 inline-block px-4 py-1 rounded-full backdrop-blur-sm border border-white/40">
             Data last updated: {lastUpdatedTime}
           </p>
         </div>
       </div>
       
       {/* Filters and Sorting */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="flex items-center gap-2 w-full md:w-auto">
-            <Filter className="w-5 h-5 text-gray-500" />
-            <label className="text-gray-700 font-medium whitespace-nowrap">Filter by City:</label>
+      <div className="bg-white/40 backdrop-blur-xl border border-white/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] p-6 rounded-3xl flex flex-col md:flex-row gap-6 justify-between items-center relative z-10">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+            <Filter className="w-5 h-5 text-blue-500" />
+            <label className="text-slate-700 font-semibold whitespace-nowrap">Filter by City:</label>
             <select 
                 value={selectedCity} 
                 onChange={(e) => setSelectedCity(e.target.value)}
-                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none w-full md:w-64 text-gray-700"
+                className="w-full p-3 pl-4 bg-white/60 border border-white/80 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-slate-700 appearance-none cursor-pointer shadow-sm hover:bg-white/80 transition-colors md:w-64"
             >
                 {cities.map(city => (
                     <option key={city} value={city}>{city}</option>
@@ -174,13 +176,13 @@ export default function HospitalFinderClient({ hospitals, lastUpdatedTime }: { h
             </select>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
-            <ArrowUpDown className="w-5 h-5 text-gray-500" />
-            <label className="text-gray-700 font-medium whitespace-nowrap">Sort by:</label>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+            <ArrowUpDown className="w-5 h-5 text-blue-500" />
+            <label className="text-slate-700 font-semibold whitespace-nowrap">Sort by:</label>
             <select 
                 value={sortBy} 
                 onChange={(e) => setSortBy(e.target.value as any)}
-                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none w-full md:w-64 text-gray-700"
+                className="w-full p-3 pl-4 bg-white/60 border border-white/80 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-slate-700 appearance-none cursor-pointer shadow-sm hover:bg-white/80 transition-colors md:w-64"
             >
                 <option value="distance">Distance (Default)</option>
                 <option value="beds">Available Beds</option>
@@ -189,10 +191,10 @@ export default function HospitalFinderClient({ hospitals, lastUpdatedTime }: { h
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
         <MapComponent hospitals={hospitals} userLocation={userLocation} />
 
-        <div id="hospital-list" className="space-y-4 max-h-[600px] overflow-y-auto pr-2 lg:col-span-1">
+        <div id="hospital-list" className="space-y-4 max-h-[600px] overflow-y-auto pr-2 lg:col-span-1 custom-scrollbar">
           {processedHospitals.length > 0 ? (
             processedHospitals.map((hospital, index) => (
               <a 
@@ -200,34 +202,34 @@ export default function HospitalFinderClient({ hospitals, lastUpdatedTime }: { h
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${hospital.name} ${hospital.city}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block bg-white cursor-pointer rounded-lg shadow-md p-4 hover:shadow-xl hover:scale-105 transition-all duration-200 border-l-4 border-pink-500"
+                className="block bg-white/40 backdrop-blur-md cursor-pointer rounded-2xl shadow-sm p-5 hover:shadow-lg hover:bg-white/60 hover:scale-[1.02] transition-all duration-300 border border-white/60 group"
               >
-                <h2 className="text-lg font-bold text-gray-800 mb-1">{hospital.name}</h2>
-                <div className="flex items-center text-gray-600 mb-2">
-                    <MapPin className="w-4 h-4 mr-1" />
-                    <span className="text-sm">{hospital.city}</span>
+                <h2 className="text-lg font-bold text-slate-800 mb-2 group-hover:text-blue-700 transition-colors">{hospital.name}</h2>
+                <div className="flex items-center text-slate-600 mb-3">
+                    <MapPin className="w-4 h-4 mr-1.5 text-blue-500" />
+                    <span className="text-sm font-medium">{hospital.city}</span>
                 </div>
-                <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg">
+                <div className="flex justify-between items-center bg-white/50 p-3 rounded-xl border border-white/50">
                     <div className="flex items-center">
-                        <Bed className="w-5 h-5 text-gray-500 mr-2" />
-                        <span className="text-sm font-medium text-gray-700">Available:</span>
+                        <Bed className="w-5 h-5 text-slate-500 mr-2" />
+                        <span className="text-sm font-semibold text-slate-700">Available Beds:</span>
                     </div>
-                    <span className={`font-bold text-lg ${getBedStatusColor(hospital.availableBeds)}`}>
+                    <span className={`font-bold text-xl ${getBedStatusColor(hospital.availableBeds)}`}>
                       {hospital.availableBeds}
                     </span>
                 </div>
-                <div className="mt-3 flex justify-between text-xs text-gray-400">
+                <div className="mt-3 flex justify-between text-xs font-medium text-slate-500 px-1">
                     <span>Total: {hospital.totalBeds}</span>
                     <span>Occupied: {hospital.occupiedBeds}</span>
                 </div>
-                <p className="text-xs text-gray-400 mt-2 text-right">
+                <p className="text-[10px] text-slate-400 mt-3 text-right italic">
                   Updated: {hospital.lastUpdated}
                 </p>
               </a>
             ))
           ) : (
-            <div className="text-center py-10 bg-white rounded-lg shadow">
-              <p className="text-gray-500">No hospitals found matching your criteria.</p>
+            <div className="text-center py-12 bg-white/40 backdrop-blur-md rounded-3xl border border-white/60">
+              <p className="text-slate-500 font-medium">No hospitals found matching your criteria.</p>
             </div>
           )}
         </div>

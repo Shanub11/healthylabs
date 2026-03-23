@@ -104,15 +104,15 @@ export default function MapComponent({ hospitals: _hospitals, userLocation }: { 
   }, [mapLoaded, userLocation]);
 
   return (
-    <div className="lg:col-span-2 relative h-96 bg-gray-200 rounded-3xl shadow-lg overflow-hidden">
-      <div className="absolute top-6 left-6 z-10 p-4 bg-white rounded-xl shadow-md">
-        <p className="text-sm font-semibold mb-2 text-black">Map Legend</p>
-        <div className="flex items-center space-x-2">
-          <span className="h-4 w-4 bg-blue-500 rounded-full"></span>
-          <span className="text-black">Your Location</span>
+    <div className="lg:col-span-2 relative h-96 bg-white/40 backdrop-blur-xl border border-white/80 shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] rounded-3xl overflow-hidden">
+      <div className="absolute top-4 left-4 z-10 p-4 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg border border-white/50">
+        <p className="text-xs font-bold mb-2 text-slate-800 uppercase tracking-wider">Map Legend</p>
+        <div className="flex items-center space-x-2 mb-1">
+          <span className="h-3 w-3 bg-blue-500 rounded-full shadow-sm"></span>
+          <span className="text-xs font-medium text-slate-700">Your Location</span>
         </div>
         <div className="flex items-center space-x-2 mt-1">
-          <span className="text-black">🏥 Nearby Hospital</span>
+          <span className="text-xs font-medium text-slate-700">🏥 Nearby Hospital</span>
         </div>
       </div>
       {error && (
