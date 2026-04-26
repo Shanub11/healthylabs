@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
@@ -22,6 +22,9 @@ export default function AnalyzeReportPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
+  
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const resultSectionRef = useRef<HTMLDivElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -108,6 +111,10 @@ export default function AnalyzeReportPage() {
     setResult(null);
     setError('');
     setActiveTab('upload');
+    
+    setTimeout(() => {
+      uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const loadHistoryItem = (item: any) => {
@@ -118,6 +125,10 @@ export default function AnalyzeReportPage() {
     setText(item.source === 'text' ? item.original_text : '');
     setFile(null);
     if (window.innerWidth < 768) setSidebarOpen(false);
+    
+    setTimeout(() => {
+      resultSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,6 +170,10 @@ export default function AnalyzeReportPage() {
       });
       setResult(response.data);
       fetchHistory(); // Refresh history after new analysis
+      
+      setTimeout(() => {
+        resultSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
 
     } catch (err: any) {
       if (axios.isCancel(err)) {
@@ -276,7 +291,7 @@ export default function AnalyzeReportPage() {
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 custom-scrollbar">
           <div className="max-w-4xl mx-auto pb-20">
-            <div className="text-center mb-10">
+            <div className="text-center mb-10" ref={uploadSectionRef}>
               <h1 className="text-4xl font-lora font-bold text-slate-800 tracking-tight sm:text-5xl mb-3">
                 AI Report <span className="text-blue-600">Analyzer</span>
               </h1>
@@ -422,7 +437,7 @@ export default function AnalyzeReportPage() {
 
             {/* Results Section */}
             {result && (
-              <div className="mt-10 animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <div className="mt-10 animate-in fade-in slide-in-from-bottom-8 duration-700" ref={resultSectionRef}>
                 <div className="bg-white/60 backdrop-blur-xl rounded-[2rem] shadow-[0_8px_32px_0_rgba(31,38,135,0.05)] overflow-hidden border border-white/80">
                   <div className="bg-gradient-to-r from-emerald-500/90 to-teal-600/90 backdrop-blur-md p-5 flex items-center justify-between">
                     <h2 className="text-white font-bold text-xl flex items-center gap-2">
