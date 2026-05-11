@@ -1,0 +1,234 @@
+Healthylabs.ai — End-to-End Medical 
+Knowledge Pipeline  
+1. Core Design Philosophy 
+Healthylabs.ai is designed as a medical-grade knowledge refinery, not a generic RAG system. 
+Key principles: 
+• Not all data is equal → Trust tiering is mandatory 
+• Embeddings are irreversible → All safety checks happen before vectorization 
+• Medicine contains contradictions → The system must detect them 
+• Every answer must be traceable → Auditability is non-negotiable 
+Mental Model (Refinery Pipeline): 
+Raw Data 
+↓ 
+Integrity Check + Trust Classification 
+↓ 
+Medical Cleaning + PHI/PII Safety 
+↓ 
+Standardized Medical Schema 
+↓ 
+Hierarchical Semantic Chunking 
+↓ 
+Enriched Embeddings 
+↓ 
+Isolated Vector + Metadata + Logic Stores 
+↓ 
+Safety-Gated Retrieval & Generation 
+2. Multi-Source Ingestion & Trust Tiering 
+2.1 Source Classification (Mandatory) 
+Every document is classified at ingestion into a Trust Tier, stored explicitly in metadata. 
+Tier 
+Source Type 
+Usage Rules 
+Authority 
+Score 
+Tier 1 (Canonical) 
+Tier 2 (Evidence
+Based) 
+Tier 3 (Exploratory) 
+This tier influences: 
+• Retrieval ranking 
+FDA, CDC, PubMed guidelines 1.0 
+Peer-reviewed journals, Mayo 
+Clinic 
+0.7 
+Blogs, user uploads 
+• Conflict resolution 
+• Answer phrasing 
+• Safety escalation thresholds 
+2.2 Data Integrity & Deduplication 
+• Every raw file is hashed using SHA-256 
+0.3 
+• The hash is checked against the SQL metadata store 
+• If the hash already exists → ingestion is skipped 
+This guarantees: 
+• No duplicate embeddings 
+• Compute efficiency 
+• Deterministic re-ingestion 
+2.3 Temporal Evidence Handling 
+Medical knowledge ages. 
+Each document stores: 
+• published_at 
+• last_reviewed_at 
+• evidence_recency_score 
+Recency logic (soft decay): 
+Can be cited directly 
+Must be supported by Tier 
+1 
+Strictly hedged, no direct 
+advice 
+• Older documents are not deleted 
+• Their retrieval weight decays relative to: 
+o Trust tier 
+o Validity window (e.g., 5 years for Tier 1) 
+• Expired or weak evidence is flagged, not silently removed 
+3. Advanced Medical Cleaning & Safety Layer 
+This layer ensures no unsafe data ever reaches the vector database. 
+3.1 PII / PHI Scrubbing (Hard Gate) 
+• Specialized medical NER models detect: 
+o Patient names 
+o IDs 
+o Addresses 
+o Dates of birth 
+• Detection confidence is explicitly measured 
+Quarantine Rule: 
+• If PHI confidence < 95% 
+o Document is diverted to a Quarantine Index 
+o Never embedded 
+o Requires human review 
+This prevents silent PHI leakage — a critical medical compliance requirement. 
+3.2 Medical De-Noising 
+• Boilerplate & legal disclaimers removed via hash-based pattern detection 
+• Unicode normalization 
+• PDF structural fixes: 
+o Broken hyphenation (anti-\nbiotics → antibiotics) 
+o Column bleed 
+o OCR artifacts 
+3.3 Retraction Awareness 
+• All Tier 1 & Tier 2 documents are checked against retraction databases 
+• Retracted documents are: 
+o Marked deprecated 
+o Excluded from citation 
+o Preserved for audit history 
+4. Standardized Medical Document Schema 
+Every document must conform to a strict schema before chunking. 
+{ 
+} 
+"doc_id": "sha256_hash", 
+"title": "Full document title", 
+"source": "FDA / PubMed / Blog", 
+"source_tier": 1, 
+"authority_score": 1.0, 
+"published_at": "YYYY-MM-DD", 
+"version": "vX.Y", 
+"tags": ["Diabetes", "Metformin"], 
+"status": "active | deprecated | quarantined" 
+This schema is immutable once embedded. 
+5. Hierarchical “Shadow” Chunking Strategy 
+This design balances precision, context, and safety. 
+5.1 Three-Level Hierarchy 
+Level 1 — Atomic Chunks (128–256 tokens) 
+• Optimized for high-precision semantic retrieval 
+• Stored in the Vector DB 
+Level 2 — Clinical Context Chunks (512–768 tokens) 
+• Parent context (dosage, contraindications, evidence level) 
+• Stored in SQL / document store 
+Level 3 — Full Document 
+• Used only for: 
+o Final synthesis 
+o Long-form summarization 
+o Audits 
+5.2 Context Injection (Critical) 
+Every Atomic Chunk is transformed before embedding: 
+[DOC_TITLE]: ... 
+[SECTION]: ... 
+[SOURCE_TIER]: ... 
+[EVIDENCE_LEVEL]: ... 
+[CONTENT]: 
+... 
+This guarantees that even small chunks carry medical meaning in isolation. 
+6. Embedding & Index Isolation 
+6.1 Embedding Rules 
+• A single, consistent embedding model is used 
+• No mixing of models within an index 
+• Re-embedding always requires a full index rebuild 
+6.2 Domain-Isolated Indices 
+Separate vector indices prevent semantic collisions: 
+• clinical_guidelines_index 
+• clinical_trials_index 
+• lifestyle_health_index 
+• user_uploaded_index 
+Routing happens before retrieval, not after. 
+7. Hybrid Retrieval Architecture 
+7.1 Vector Index (Semantic Reasoning) 
+• Handles nuance, similarity, explanations 
+• Uses metadata pre-filtering: 
+o Tier 
+o Recency 
+o Evidence type 
+7.2 Knowledge Graph (Hard Medical Logic) 
+A parallel Knowledge Graph (KG) stores: 
+• Drug → Drug interactions 
+• Drug → Condition contraindications 
+• Trial phase → Evidence strength 
+Override Rule: 
+If KG detects a contraindication, it overrides vector retrieval results, regardless of semantic 
+similarity. 
+7.3 Temporal & Evidence Filters 
+Queries can enforce: 
+• “Only RCTs” 
+• “Only studies from last N months” 
+• “Exclude Phase 1 trials” 
+8. Medical Safety Gates & Conflict Engine 
+8.1 Contradiction Detection 
+• Top-K retrieved chunks are cross-checked 
+• If conflicts are detected (e.g., dosage mismatch): 
+o A Contradiction Cluster is formed 
+o The system: 
+▪ Flags uncertainty 
+▪ Produces a hedged response 
+▪ Escalates when risk is high 
+8.2 Trial Phase Handling 
+• Phase 1 trials → downgraded 
+• Phase 4 / approved drugs → promoted 
+• Trial phase directly affects authority weighting 
+9. Query-Time Safety & Auditability 
+9.1 Query Intent Classifier 
+Every query is classified as: 
+• Emergency / Diagnostic 
+• General research 
+• Educational 
+Emergency intents trigger: 
+• Immediate disclaimers 
+• Redirection to medical professionals 
+• Suppression of actionable advice 
+9.2 Full Audit Trail 
+Every answer stores: 
+• Query 
+• Retrieved chunk_ids 
+• Source document version hashes 
+• Authority scores 
+• Conflict flags 
+• Reviewer or system decision ID 
+This enables: 
+• Debugging 
+• Legal traceability 
+• Regulatory audits 
+9.3 Blue/Green Index Deployment 
+• New data is ingested into a Shadow Index 
+• Validation suite is run: 
+o Golden questions 
+o Recall checks 
+o Noise audits 
+• Only then is the live pointer switched 
+Zero downtime, zero silent regressions. 
+10. System Guarantees 
+This architecture guarantees: 
+• No unsafe data reaches embeddings 
+• No answer without traceable evidence 
+• No contradiction without detection 
+• No duplicate ingestion 
+• No silent model or data drift 
+11. Final Takeaway  
+This is not just a RAG pipeline. 
+It is: 
+• A medical knowledge system 
+• With safety gates 
+• Evidence weighting 
+• Temporal awareness 
+• Conflict detection 
+• Full auditability 
+If implemented as designed, it is: 
+• Defensible 
+• Scalable 
+• Review-ready 
+• And aligned with real medical AI expectations 

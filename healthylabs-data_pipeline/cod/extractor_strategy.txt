@@ -1,0 +1,1024 @@
+HealthyLabs Medical Data Extractor 
+FINAL COMPREHENSIVE EXTRACTION STRATEGY (WITH ALL FIXES) 
+PART 0: EXECUTIVE SUMMARY 
+This document defines the medical-grade data extraction strategy for HealthyLabs.ai. The extractor is a 
+neutral preservation layer that feeds the downstream pipeline with high-fidelity content, rich structure, 
+and clear quality signals—without interpretation. 
+Core Principles: 
+• Preserve everything - Never discard source information 
+• Remain neutral - No interpretation, no trust-tier judgment 
+• Surface structure - Layout, hierarchy, relationships 
+• Signal quality - Confidence scores, warnings, audit trails 
+• Enable multi-modal - Images preserved and linked to text 
+Output Guarantees: 
+• Lossless image preservation (original formats retained) 
+• Complete audit trail (chain of custody) 
+• Rich structural annotations (layout graph, hierarchy, citations) 
+• Quality transparency (OCR confidence, extraction warnings) 
+• Bidirectional linking (text ↔ images, layout ↔ hierarchy) 
+PART 1: SYSTEM ARCHITECTURE 
+1.1 Core Design Philosophy 
+The extractor is a medical-grade intake valve with a single responsibility: preserve every byte of 
+information with absolute fidelity while providing clear structural signals to downstream systems. It 
+operates independently of the refinery pipeline and remains trust-tier agnostic—judgment happens later. 
+Raw Sources → STAGE 1: FETCHER → STAGE 2: VALIDATOR → STAGE 3: EXTRACTOR → STAGE 
+4: DELIVERY → Pipeline 
+↓                      ↓                      ↓                      
+↓ 
+Source-agnostic        Deduplication         Multi-modal            
+Schema-compliant 
+download               via SHA-256           preservation           
+packaging 
+1.2 The Four Stages 
+Stage 1: Fetcher (Source-Agnostic Downloader) 
+Responsibility: Authenticate and download files from diverse sources with retry logic. 
+Supported Sources: 
+• Google Drive (via API with OAuth) 
+• Public HTTPS/HTTP URLs 
+• Amazon S3 / S3-compatible storage (MinIO) 
+• SFTP servers 
+• Local file system mounts 
+• Email attachments (IMAP) 
+Stage 2: Validator (Deduplication & Integrity) 
+Responsibility: Prevent redundant processing and verify file integrity. 
+Core Functions: 
+• SHA-256 hash computation of binary file before any preprocessing 
+• Check against metadata store (PostgreSQL) 
+• Skip if hash exists with complete audit trail 
+• Log duplicate attempts for tracking 
+Document ID Definition: 
+document_id = sha256-of-original-binary-file 
+• Hash computed on raw bytes as received 
+• Stable across re-ingestion attempts 
+• Primary key for all document references 
+Stage 3: Polymorphic Extraction Engine 
+Responsibility: Convert any binary input into a standardized, high-fidelity output package. 
+Output Package Structure: 
+{ 
+"document_id": "a1b2c3...", 
+"content": "markdown_text_with_placeholders", 
+"images": [...], 
+"tables": [...], 
+"layout_graph": {...}, 
+"section_hierarchy": {...}, 
+"citations": {...}, 
+"medical_patterns": {...}, 
+"metadata": {...}, 
+"quality": {...}, 
+"audit": {...} 
+} 
+Stage 4: Delivery Agent 
+Responsibility: Package and deliver to pipeline with retry logic. 
+Features: 
+• Schema validation before sending 
+• Exponential backoff retry (3 attempts) 
+• Dead letter queue for permanent failures 
+• Delivery confirmation tracking 
+PART 2: FILE TYPE SUPPORT 
+2.1 Comprehensive Format Matrix 
+Category 
+File Types 
+Primary Tool 
+Documents 
+PDF (digital) 
+pypdfium2 
+Fallback 
+Preservation Strategy 
+pypdf 
+PDF 
+(scanned) 
+OCRmyPDF + 
+Tesseract 5 
+Lossless text + images 
+Unstructured 
+DOCX 
+python-docx 
+OCR + original images 
+markitdown 
+DOC 
+(legacy) 
+antiword 
+Preserve tables, styles 
+catdoc 
+RTF 
+striprtf 
+Extract text only - 
+Presentations PPTX 
+python-pptx 
+Strip formatting - 
+PPT (legacy) 
+ppt2txt 
+Slides + notes + images - 
+Web 
+HTML 
+trafilatura 
+Basic text fallback 
+beautifulsoup4 Main content + metadata 
+ XML defusedxml - Security-first parsing 
+E-books EPUB ebooklib - Chapter structure 
+ MOBI/AZW calibre (CLI) - Convert to EPUB first 
+Images JPEG Pillow - Store original + metadata 
+ PNG Pillow - Store original 
+ TIFF Pillow - Store original (multi-page) 
+ JPEG2000 
+Pillow (with 
+openjpeg) - Store original 
+ DICOM pydicom - Store original + metadata 
+ BMP/GIF Pillow - 
+Store + optional PNG 
+derivative 
+Archives ZIP zipfile - Extract recursively 
+ TAR/GZ tarfile - Preserve structure 
+ 7z py7zr - Password quarantine 
+ 
+PART 3: IDENTITY & REFERENCING (FIX 1) 
+3.1 Unified ID Format 
+All identifiers are globally unique and doc-scoped by prefixing with document_id. 
+Entity ID Format Example 
+Document {document_id} a1b2c3d4e5... 
+Layout Node {document_id}_layout_{page}_{reading_order} a1b2c3_layout_12_17 
+Section {document_id}_sec_{hierarchy_path} a1b2c3_sec_3_1 
+Image {document_id}_img_{page}_{index} a1b2c3_img_12_3 
+Table 
+Citation 
+{document_id}_tbl_{page}_{index} 
+{document_id}_cit_{index} 
+a1b2c3_tbl_5_1 
+a1b2c3_cit_42 
+Rationale 
+• Prevents collisions when merging documents in downstream databases 
+• Enables distributed storage without central ID coordination 
+• Simplifies joins and lookups 
+• Self-documenting (type visible in ID) 
+PART 4: IMAGE HANDLING POLICY 
+4.1 Core Principle: Never Replace Original 
+Original 
+Format 
+Storage Action 
+JPEG 
+Store original JPEG 
+Rationale 
+Conversion to PNG doesn't restore lost 
+data 
+PNG/TIFF 
+Store original 
+Already lossless 
+JPEG2000 
+Store original 
+Medical-grade format 
+DICOM 
+Store original DICOM 
+Metadata + pixels critical 
+BMP/GIF 
+Store original + optional PNG 
+derivative 
+Legacy formats 
+Derivative Strategy 
+• Create PNG copy alongside original for processing convenience 
+• Never delete or replace original 
+• Store both with clear relationship 
+"images": [ 
+{ 
+"image_id": "a1b2c3_img_12_3", 
+"original": { 
+"format": "JPEG", 
+"path": "s3://images/a1b2c3_img_12_3.jpg", 
+"hash": "sha256-of-jpeg", 
+"size_bytes": 245760 
+}, 
+"derivatives": { 
+"png_lossless": { 
+"path": "s3://images/a1b2c3_img_12_3.png", 
+"hash": "sha256-of-png", 
+"size_bytes": 1850000, 
+"purpose": "processing" 
+} 
+} 
+} 
+] 
+4.2 Text-Containing Images: Never Discard 
+Rule: If an image contains text, preserve the original AND provide OCR. 
+Why: 
+• OCR errors happen (μ vs μ, 10mg vs 100mg) 
+• Layout conveys meaning (superscripts, subscripts) 
+• Dosage formatting may be visual 
+• Audit trail requires original 
+"text_snippet_image": { 
+"image_id": "a1b2c3_img_7_3", 
+"original_path": "s3://images/a1b2c3_img_7_3.jpg", 
+"ocr_text": "Take 10 mg twice daily", 
+"ocr_confidence": 0.94, 
+"ocr_engine": "tesseract-5.3.0", 
+"layout_notes": "superscript detected on 'mg'" 
+} 
+4.3 Image Enhancement: Geometric Only 
+Allowed (Safe): 
+• Deskew (affine transform only) 
+• Despeckle (morphological filtering) 
+• Contrast stretching (histogram adjustment) 
+• Binarization (thresholding algorithms) 
+• Sharpening (unsharp mask - kernel-based) 
+Prohibited (Unsafe): 
+• Neural upscaling (can hallucinate strokes) 
+• Generative inpainting (creates fake data) 
+• Super-resolution ML (adds false details) 
+• Any ML that modifies text shapes 
+PART 5: OCR & TEXT EXTRACTION 
+5.1 OCR Pipeline 
+Scanned PDF Processing 
+1. Preprocessing (geometric only): 
+a. Deskew 
+b. Despeckle 
+c. Contrast enhancement 
+d. Resolution check (target 300-600 DPI) 
+2. OCR Engine: Tesseract 5 with medical language pack 
+a. Custom-trained on medical terminology 
+b. Pharmaceutical term dictionary 
+c. Greek/Math symbol support 
+3. Confidence Scoring: 
+a. Word-level confidence from Tesseract 
+b. Page-level aggregation 
+c. Document-level summary 
+5.2 OCR Confidence Thresholds 
+Average Confidence 
+Action 
+Notes 
+≥ 95% 
+High quality 
+Pass through 
+90-94% 
+Good 
+Pass through 
+85-89% 
+Acceptable 
+Pass with flag 
+80-84% 
+Low - Flag 
+Flag for potential review 
+75-79% 
+Very Low - Flag 
+Flag prominently 
+< 75% 
+Quarantine 
+Human review required 
+5.3 Digital Text Extraction 
+Primary Tool: pypdfium2 (Chromium PDF engine) 
+Fallback Chain: 
+1. pypdfium2 
+2. pypdf (if pypdfium2 fails) 
+3. pdfminer.six (text-only fallback) 
+5.4 Character Encoding 
+Problem: Medical texts contain Greek letters (β, μ), math symbols (≤, ≥), diacritics (é, ñ), and special 
+characters (§, †). 
+Solution: 
+1. Detect encoding with charset-normalizer 
+2. Convert to UTF-8 
+3. Normalize Unicode form (NFC) 
+4. Validate against medical symbol dictionary 
+5. Log any replacements or failures 
+PART 6: STRUCTURAL EXTRACTION 
+6.1 Layout Graph with Reading Order 
+Purpose: Preserve spatial relationships and correct reading flow. 
+"layout_graph": { 
+"nodes": [ 
+{ 
+"node_id": "a1b2c3_layout_12_17", 
+"type": "paragraph",  // paragraph, header, figure, table, caption 
+"text": "Dosage: 10 mg twice daily", 
+"bbox": [10, 45, 200, 60], 
+"page": 12, 
+"reading_order": 17,        // Critical for multi-column 
+"column": "left",            // Detected column 
+"section_id": "a1b2c3_sec_3_1",     // Links to hierarchy 
+"referenced_images": ["a1b2c3_img_12_3"],  // Images in this node 
+"citations": ["a1b2c3_cit_42"], 
+"confidence": 0.98 
+}, 
+{ 
+this 
+} 
+"node_id": "a1b2c3_layout_12_18", 
+"type": "figure", 
+"image_id": "a1b2c3_img_12_3", 
+"caption": "Figure 1: MRI results", 
+"bbox": [10, 65, 200, 150], 
+"page": 12, 
+"reading_order": 18, 
+"section_id": "a1b2c3_sec_3_1", 
+"referenced_by": ["a1b2c3_layout_12_17"]  // Text nodes referencing 
+], 
+"edges": [ 
+{"from": "a1b2c3_layout_12_17", "to": "a1b2c3_layout_12_18", "relation": 
+"references"}, 
+{"from": "a1b2c3_layout_12_16", "to": "a1b2c3_layout_12_17", "relation": 
+"precedes"} 
+] 
+} 
+Edge Type Enumeration (FIX 2) 
+The following relation types are frozen and must be used consistently: 
+Relation 
+Meaning 
+contains 
+Parent-child structural relationship 
+references 
+Text mentions/cites another node 
+caption_of 
+Caption node belongs to figure/table 
+adjacent 
+Next to in layout (spatial) 
+precedes 
+Previous in reading order 
+continues 
+Text continues across page break 
+overlaps 
+Spatial overlap (rare) 
+Reading Order Determination 
+1. PDF tag tree (if available) → highest accuracy 
+2. Column detection + vertical position → reliable 
+3. Line-of-sight flow (ML-based) → fallback 
+4. Simple top-to-bottom → last resort 
+Content Generation Rule 
+content = concatenation of layout node text in reading_order 
+• Preserves correct document flow 
+• Uses reading_order field, not page position 
+• Ensures consistent output across extractor versions 
+6.2 Section Hierarchy 
+Purpose: Preserve document structure for contextual retrieval. 
+"section_hierarchy": { 
+"id": "a1b2c3_sec_0", 
+"type": "document", 
+"title": "Harrison's Chapter 12: Hypertension", 
+"page_span": [1, 45],  // FIX 3: Added page range 
+"children": [ 
+{ 
+"id": "a1b2c3_sec_1", 
+"type": "section", 
+"level": 1, 
+"heading": "Introduction", 
+"text_range": [0, 1000], 
+"page_span": [1, 3],  // FIX 3: Pages this section covers 
+"layout_nodes": ["a1b2c3_layout_1_1", "a1b2c3_layout_1_2", 
+"a1b2c3_layout_2_5"], 
+"children": [] 
+}, 
+{ 
+"id": "a1b2c3_sec_2", 
+"type": "section", 
+"level": 1, 
+"heading": "Pathophysiology", 
+"text_range": [1001, 2500], 
+"page_span": [3, 8], 
+"layout_nodes": ["a1b2c3_layout_3_1", "a1b2c3_layout_4_3"], 
+"children": [ 
+{ 
+"id": "a1b2c3_sec_2_1", 
+"type": "subsection", 
+"level": 2, 
+"heading": "Hemodynamics", 
+"text_range": [1001, 1600], 
+"page_span": [3, 5], 
+"layout_nodes": ["a1b2c3_layout_3_1"], 
+"children": [] 
+} 
+] 
+} 
+] 
+} 
+Section Detection Methods 
+• Heading pattern matching (numbered, bold, larger font) 
+• PDF outline/bookmarks 
+• Style analysis (font size, weight) 
+• Table of contents parsing 
+6.3 Citation Extraction 
+Purpose: Enable evidence-based answers and auditability. 
+"citations": { 
+    "inline": [ 
+        { 
+            "citation_id": "a1b2c3_cit_42", 
+            "text": "Smith et al. (2020) demonstrated...", 
+            "text_span": [1250, 1280], 
+            "layout_node": "a1b2c3_layout_12_17",  // Stable reference 
+            "section_id": "a1b2c3_sec_3_1",  // FIX 5: Added section link 
+            "position_in_node": [50, 80],  // Offsets within node 
+            "references": [ 
+                { 
+                    "ref_id": "a1b2c3_ref_1", 
+                    "type": "doi", 
+                    "value": "10.1016/j.med.2020.01.005", 
+                    "confidence": 0.98 
+                }, 
+                { 
+                    "ref_id": "a1b2c3_ref_2", 
+                    "type": "pmid", 
+                    "value": "32145678", 
+                    "confidence": 0.95 
+                } 
+            ] 
+        } 
+    ], 
+    "bibliography": [ 
+        { 
+            "entry_id": "a1b2c3_bib_1", 
+            "raw_text": "Smith J, Johnson K. Clinical trial of... JAMA. 
+2020;123(1):45-52", 
+            "parsed": { 
+                "authors": ["Smith J", "Johnson K"], 
+                "title": "Clinical trial of...", 
+                "journal": "JAMA", 
+                "year": 2020, 
+                "volume": 123, 
+                "issue": 1, 
+                "pages": "45-52", 
+                "doi": "10.1001/jama.2020.12345" 
+            }, 
+            "confidence": 0.95 
+        } 
+    ] 
+} 
+  
+Citation Parsing Tools 
+• anystyle for bibliography parsing 
+• grobid for PDF reference extraction 
+• Custom regex patterns for inline citations 
+6.4 Table Extraction 
+Purpose: Preserve tabular data in structured format. 
+"tables": [ 
+{ 
+"table_id": "a1b2c3_tbl_5_1", 
+"layout_node": "a1b2c3_layout_5_78", 
+"section_id": "a1b2c3_sec_2_1",  // FIX: Added section link 
+"caption": "Table 2: Dosing by weight", 
+"markdown": "| Weight (kg) | Dose (mg) |\n|-------------|-----------|\n| 
+<50 | 10 |\n| 50-70 | 20 |\n| >70 | 30 |", 
+"csv": "Weight (kg),Dose (mg)\n<50,10\n50-70,20\n>70,30", 
+"bbox": [10, 200, 500, 300], 
+"page": 5 
+} 
+] 
+Table Extraction Strategy 
+Source 
+Native PDF tables 
+Tool 
+camelot-py 
+Scanned table images 
+table-transformer 
+DOCX tables 
+python-docx 
+HTML tables 
+beautifulsoup4 
+PART 7: MEDICAL PATTERN TAGGING (NON
+INTERPRETIVE) 
+7.1 Purpose and Boundaries 
+What This Is: 
+• Pattern detection (finding strings that look like dosages) 
+• Unit identification (mg, mL, mcg) 
+• Unit normalization for downstream comparison 
+• Section location (where dosage information lives) 
+• NEVER interpretation or safety checking 
+What This Is NOT: 
+• NOT checking against formularies 
+• NOT flagging contraindications 
+• NOT making safety decisions 
+• NOT interpreting meaning 
+7.2 Dosage Pattern Detection with Normalization (FIX 4) 
+"medical_patterns": { 
+"dosage_indicators": [ 
+{ 
+"text": "10 mg", 
+"layout_node": "a1b2c3_layout_12_17", 
+"position_in_node": [0, 5], 
+"units": "mg", 
+"unit_normalized": "mg",  // FIX 4: Normalized form 
+"numeric_value": "10", 
+"confidence": 0.99 
+}, 
+{ 
+}, 
+{ 
+}, 
+{ 
+"text": "twice daily", 
+"layout_node": "a1b2c3_layout_12_17", 
+"position_in_node": [6, 10], 
+"frequency_indicator": true, 
+"frequency_normalized": "BID",  // FIX 4: Normalized form 
+"confidence": 0.95 
+"text": "0.5 mL", 
+"layout_node": "a1b2c3_layout_12_56", 
+"position_in_node": [20, 24], 
+"units": "mL", 
+"unit_normalized": "mL", 
+"numeric_value": "0.5", 
+"confidence": 0.98 
+"text": "100 mcg", 
+"layout_node": "a1b2c3_layout_14_23", 
+"units": "mcg", 
+"unit_normalized": "ug",  // FIX 4: Normalized to ug 
+"numeric_value": "100", 
+"confidence": 0.97 
+} 
+], 
+"units_detected": ["mg", "mL", "mcg", "units", "IU", "mEq"], 
+"unit_normalization_map": {  // Internal mapping 
+"μg": "ug", 
+"mcg": "ug", 
+"MG": "mg", 
+"ML": "mL" 
+}, 
+"frequency_terms": ["daily", "BID", "TID", "QID", "q12h", "q8h", "PRN"], 
+"frequency_normalization_map": { 
+"daily": "daily", 
+"once daily": "daily", 
+"qd": "daily", 
+"bid": "BID", 
+"twice daily": "BID", 
+"tid": "TID", 
+"three times daily": "TID" 
+}, 
+"route_indicators": ["PO", "IV", "IM", "SC", "subcutaneous", "intravenous"], 
+"dosage_section": { 
+"detected": true, 
+"detection_source": "heading_match",  // heading_match, pattern_density, 
+classifier, none 
+"confidence": 0.95, 
+"section_id": "a1b2c3_sec_2_1" 
+} 
+} 
+Normalization Rules 
+Raw 
+Normalized 
+mg, MG, Mg 
+mg 
+Notes 
+Case-insensitive 
+μg, mcg 
+ug 
+Both map to 'ug' for comparison 
+mL, ML, ml 
+mL 
+Standardize to mL 
+BID, bid, b.i.d. 
+BID 
+Standard abbreviation 
+QD, qd, daily 
+daily 
+Common variations 
+Detection Methods 
+Pattern 
+Method 
+Units 
+Frequencies 
+Regex patterns + medical dictionary 
+Predefined list + abbreviation expansion 
+Routes 
+Medical terminology list 
+Dosage sections 
+Heading matching + pattern density 
+PART 8: METADATA EXTRACTION 
+8.1 Document Metadata 
+Sources (in priority order): 
+1. Document properties (PDF metadata, DOCX properties) 
+2. First page analysis (title, authors, date) 
+3. Copyright page (publisher, edition, year) 
+4. Headers/footers (running titles) 
+5. DOI/ISBN resolution 
+"metadata": { 
+"title": { 
+"value": "Harrison's Principles of Internal Medicine, 21st Edition", 
+"source": "pdf_metadata", 
+"confidence": 1.0 
+}, 
+"authors": { 
+"value": ["Kasper DL", "Fauci AS", "Hauser SL"], 
+"source": "title_page", 
+"confidence": 0.95 
+}, 
+"published_at": { 
+"value": "2022-03-15", 
+"source": "copyright_page", 
+"confidence": 0.98 
+}, 
+"publisher": { 
+"value": "McGraw Hill", 
+"source": "pdf_metadata", 
+"confidence": 1.0 
+}, 
+"doi": { 
+"value": "10.1036/0071466339", 
+"source": "first_page", 
+"confidence": 0.99 
+}, 
+"isbn": { 
+"value": "978-0071466332", 
+"source": "copyright_page", 
+"confidence": 1.0 
+} 
+} 
+Confidence Scoring 
+Source 
+Document properties (validated) 
+Confidence 
+1.0 
+Prominent first-page text 
+0.9 
+Header/footer pattern 
+0.7 
+Filename heuristic 
+0.4 
+Generated default 
+0.1 
+Human Review Trigger: If any critical field (title, authors, date) has confidence < 0.8, flag document. 
+PART 9: QUALITY ASSURANCE 
+9.1 Quality Metrics 
+"quality": { 
+"overall_score": 0.94, 
+"ocr_confidence": { 
+"overall": 0.92, 
+"per_page": [ 
+{"page": 1, "confidence": 0.98}, 
+{"page": 2, "confidence": 0.95}, 
+{"page": 3, "confidence": 0.87, "warning": "low_contrast"} 
+], 
+"low_confidence_words": 12, 
+"total_words": 5842 
+}, 
+"image_quality": { 
+"total_images": 24, 
+"images_preserved": 24, 
+"high_resolution": 22, 
+"low_resolution": 2, 
+"warnings": ["page7_img3_low_resolution"] 
+}, 
+"metadata_completeness": { 
+"fields_populated": ["title", "authors", "published_at"], 
+"fields_missing": ["doi"], 
+"percentage": 0.75 
+}, 
+"issues": [ 
+{ 
+"severity": "warning", 
+"message": "page_3_low_ocr_confidence_0.87", 
+"component": "ocr" 
+} 
+] 
+} 
+9.2 Quality Thresholds 
+Score 
+Meaning 
+≥ 0.95 
+Excellent 
+Action 
+Pass 
+0.85-0.94 
+Good 
+Pass 
+0.75-0.84 
+Acceptable 
+Pass with flag 
+0.60-0.74 
+Poor 
+Flag prominently 
+< 0.60 
+Failing 
+Quarantine 
+9.3 Quarantine Triggers 
+Documents are quarantined (human review required) for: 
+• OCR confidence < 75% 
+• Critical metadata fields missing 
+• Password protection 
+• Extraction failure after all fallbacks 
+• Quality score < 0.60 
+PART 10: AUDIT & TRACEABILITY 
+10.1 Chain of Custody 
+"audit": { 
+"document_id": "a1b2c3d4e5...", 
+"source": { 
+        "uri": "gdrive://file_id/v123", 
+        "fetch_timestamp": "2024-01-15T10:30:00Z", 
+        "fetch_method": "google_drive_api_v3", 
+        "source_metadata": { 
+            "original_filename": "harrisons_ch12.pdf", 
+            "file_size": 5242880, 
+            "mime_type": "application/pdf" 
+        } 
+    }, 
+    "validation": { 
+        "hash": "a1b2c3d4e5...",  // Same as document_id 
+        "dedupe_result": "new_document", 
+        "timestamp": "2024-01-15T10:30:01Z" 
+    }, 
+    "extraction": { 
+        "engine_version": "healthylabs-extractor-2.1.0", 
+        "started_at": "2024-01-15T10:30:02Z", 
+        "completed_at": "2024-01-15T10:31:15Z", 
+        "duration_sec": 73, 
+        "components": [ 
+            { 
+                "stage": "pdf_parse", 
+                "tool": "pypdfium2-4.1.0", 
+                "status": "success", 
+                "duration_sec": 5.2 
+            }, 
+            { 
+                "stage": "image_extraction", 
+                "tool": "pypdfium2-4.1.0", 
+                "images_extracted": 24, 
+                "status": "success", 
+                "duration_sec": 3.1 
+            }, 
+            { 
+                "stage": "ocr_fallback", 
+                "tool": "tesseract-5.3.0", 
+                "pages_processed": [3, 4, 7], 
+                "avg_confidence": 0.92, 
+                "status": "success", 
+                "duration_sec": 42.0 
+            } 
+        ], 
+        "warnings": ["page_7_low_ocr_confidence_0.87"] 
+    } 
+} 
+  
+ 
+PART 11: EDGE CASE HANDLING 
+11.1 Document Size Extremes 
+Scenario Risk Strategy 
+1,000+ page textbook Memory exhaustion Page-streaming, process sequentially 
+1GB+ PDF Timeout Chunked download, streaming parse 
+10,000+ images Storage spike Immediate S3 upload, don't hold in memory 
+11.2 Corruption Scenarios 
+Scenario Strategy 
+Corrupted PDF Fallback chain (pypdfium2 → pypdf → pdfminer) 
+Truncated file Detect size mismatch, quarantine 
+Malformed XML defusedxml safety, quarantine on error 
+Infinite loop Hard timeout per document (10 min max) 
+11.3 Security Scenarios 
+Scenario Strategy 
+Password protected Quarantine, never attempt guessing 
+Suspicious content Sandboxed extraction, resource limits 
+Zip bombs Detect decompression ratio, abort 
+Script in PDF Isolated environment, disable JavaScript 
+11.4 Medical Edge Cases 
+Scenario Strategy 
+Retracted publication Check against retraction DB, flag in metadata 
+Supplementary materials Group with main document 
+Non-English text Language detection, preserve original 
+Handwritten annotations Detect, preserve image, flag for human review 
+Watermarks Detect, preserve, log presence 
+ 
+PART 12: TECHNOLOGY STACK (OPEN SOURCE) 
+12.1 Core Components 
+Layer Technology Justification 
+Language Python 3.11+ Ecosystem, medical libraries 
+Workflow Prefect DAG management, retries, monitoring 
+Queue Redis + RQ Simple, reliable, persistent 
+Storage MinIO (S3-compatible) Self-hosted, scalable, erasure coding 
+Database PostgreSQL 15 Metadata, audit, dedupe 
+Container Docker + Kubernetes Isolation, scaling 
+12.2 Document Processing 
+Task Primary Tool Fallback License 
+PDF parsing pypdfium2 pypdf BSD-3 
+OCR engine Tesseract 5 OCRmyPDF Apache 2.0 
+OCR preprocessing OpenCV Pillow Apache 2.0 
+DOCX processing python-docx - MIT 
+PPTX processing python-pptx - MIT 
+HTML extraction trafilatura beautifulsoup4 Apache 2.0 
+EPUB handling ebooklib - GPL 
+12.3 Image Processing 
+Task 
+Primary Tool 
+Image manipulation 
+Pillow 
+License 
+HPND 
+Layout analysis 
+LayoutParser 
+Apache 2.0 
+Table detection 
+camelot-py 
+MIT 
+Table structure 
+table-transformer 
+DICOM handling 
+pydicom 
+Apache 2.0 
+MIT 
+12.4 ML Components (Optional) 
+Task 
+Model/Tool 
+Layout analysis 
+Detectron2 
+License 
+Apache 2.0 
+Citation parsing 
+anystyle 
+BSD 
+Language detection 
+fastText 
+MIT 
+Encoding detection 
+charset-normalizer 
+MIT 
+PART 13: SYNTAX & PLACEHOLDER STANDARDS 
+(FIXES) 
+13.1 Image Placeholder Syntax 
+Standard Format: 
+[IMAGE:{image_id}] 
+Examples: 
+• [IMAGE:a1b2c3_img_12_3] 
+• [IMAGE:a1b2c3_img_5_1] 
+Usage in content: 
+The Circle of Willis is shown in [IMAGE:a1b2c3_img_12_3]. 
+13.2 Table Placeholder Syntax 
+Standard Format: 
+[TABLE:{table_id}] 
+Examples: 
+• [TABLE:a1b2c3_tbl_5_1] 
+13.3 Citation Placeholder Syntax 
+Standard Format: 
+[CITATION:{citation_id}] 
+Examples: 
+• [CITATION:a1b2c3_cit_42] 
+PART 14: OUTPUT SCHEMA (COMPLETE) 
+{ 
+"document_id": "a1b2c3d4e5...", 
+"content": "# Chapter 12\n\nThe Circle of Willis [IMAGE:a1b2c3_img_12_3] is 
+shown in Figure 12.3. [CITATION:a1b2c3_cit_42]", 
+"images": [ 
+{ 
+"image_id": "a1b2c3_img_12_3", 
+"original": { 
+"format": "JPEG", 
+"path": "s3://images/a1b2c3_img_12_3.jpg", 
+"hash": "sha256...", 
+"size_bytes": 245760 
+}, 
+"derivatives": { 
+"png": { 
+"path": "s3://images/a1b2c3_img_12_3.png", 
+"hash": "sha256..." 
+} 
+            }, 
+            "caption": "Figure 12.3: Circle of Willis", 
+            "type": "anatomical_diagram", 
+            "width": 1200, 
+            "height": 800, 
+            "page": 12, 
+            "bbox": [10, 20, 210, 220], 
+            "referenced_by": ["a1b2c3_layout_12_17", "a1b2c3_layout_12_45"], 
+            "section_id": "a1b2c3_sec_3_1" 
+        } 
+    ], 
+     
+    "tables": [ 
+        { 
+            "table_id": "a1b2c3_tbl_5_1", 
+            "layout_node": "a1b2c3_layout_5_78", 
+            "section_id": "a1b2c3_sec_2_1", 
+            "markdown": "| Dose | Response |\n|------|----------|", 
+            "page": 5 
+        } 
+    ], 
+     
+    "layout_graph": { 
+        "nodes": [ 
+            { 
+                "node_id": "a1b2c3_layout_12_17", 
+                "type": "paragraph", 
+                "text": "As shown in Figure 12.3...", 
+                "bbox": [10, 45, 200, 60], 
+                "page": 12, 
+                "reading_order": 17, 
+                "column": "left", 
+                "section_id": "a1b2c3_sec_3_1", 
+                "referenced_images": ["a1b2c3_img_12_3"], 
+                "citations": ["a1b2c3_cit_42"] 
+            } 
+        ], 
+        "edges": [ 
+            {"from": "a1b2c3_layout_12_17", "to": "a1b2c3_layout_12_18", 
+"relation": "references"} 
+        ] 
+    }, 
+     
+    "section_hierarchy": { 
+        "id": "a1b2c3_sec_0", 
+        "page_span": [1, 45], 
+        "children": [...] 
+    }, 
+     
+    "citations": { 
+        "inline": [ 
+            { 
+                "citation_id": "a1b2c3_cit_42", 
+                "layout_node": "a1b2c3_layout_12_17", 
+                "section_id": "a1b2c3_sec_3_1", 
+                "references": [...] 
+            } 
+        ], 
+        "bibliography": [...] 
+    }, 
+     
+    "medical_patterns": { 
+        "dosage_indicators": [ 
+            { 
+                "text": "10 mg", 
+                "layout_node": "a1b2c3_layout_12_17", 
+                "units": "mg", 
+                "unit_normalized": "mg", 
+                "numeric_value": "10" 
+            } 
+        ], 
+        "units_detected": ["mg", "mL"], 
+        "dosage_section": { 
+            "detected": true, 
+            "detection_source": "heading_match", 
+            "section_id": "a1b2c3_sec_2_1" 
+        } 
+    }, 
+     
+    "metadata": { 
+        "title": {"value": "Harrison's...", "confidence": 0.98}, 
+        "authors": [...], 
+        "published_at": {"value": "2022-03-15", "confidence": 0.95} 
+    }, 
+     
+    "quality": { 
+        "overall_score": 0.94, 
+        "issues": [] 
+    }, 
+     
+    "audit": { 
+        "document_id": "a1b2c3d4e5...", 
+        "source": {...}, 
+        "extraction": {...} 
+    } 
+} 
+  
+ 
+PART 15: INTEGRATION WITH DOWNSTREAM 
+PIPELINE 
+15.1 What Extractor Provides 
+Pipeline Component 
+Trust Tiering 
+Extractor Contribution 
+Source URI, extraction quality (pipeline judges) 
+PHI Safety 
+Pattern hints only (pipeline decides) 
+Medical Cleaning 
+UTF-8 normalized text, boilerplate hints 
+Document Schema 
+Extracted metadata with confidence 
+Hierarchical Chunking 
+Section hierarchy, layout graph, page spans 
+Embedding 
+Clean markdown with image references 
+Multi-Modal Retrieval 
+Images + bidirectional links 
+Contradiction Detection 
+Normalized dosage patterns, citations 
+Audit Trail 
+Complete chain of custody 
+15.2 Handoff Contract 
+Extractor guarantees: 
+• Lossless preservation of source content 
+• Neutral, uninterpreted extraction 
+• Rich structural annotations 
+• Quality signals and confidence scores 
+• Complete audit trail 
+• Consistent ID format across all entities 
+• Normalized units for downstream comparison 
+Pipeline guarantees: 
+• All interpretation and judgment 
+• Safety decisions 
+• Trust tier application 
+• PHI redaction 
+• Contradiction detection 
+PART 16: SUMMARY OF GUARANTEES 
+Guarantee How It's Achieved 
+No information loss Original images preserved, never discarded 
+No interpretation Neutral extraction, patterns only 
+Multi-column correctness Reading order index in layout 
+Stable references Doc-scoped IDs survive across systems 
+Multi-modal ready Bidirectional image-text linking 
+Evidence traceable Citation extraction with section links 
+Consistent IDs Unified docHash_type_page_index format 
+Normalized comparisons Units standardized (mg, ug, mL) 
+Edge type consistency Frozen relation enum 
+Page-aware hierarchy Page spans on all sections 
+Quality transparency Confidence scores on all extractions 
+Security Sandboxed, no password guessing 
+Auditability Complete chain of custody 
+Medical safety No generative enhancement, conservative thresholds 
+ 
+READY TO BUILD 
+This strategy provides everything needed to implement a medical-grade extraction layer that: 
+1. Preserves all information losslessly 
+2. Structures content with consistent, globally-unique IDs 
+3. Links modalities bidirectionally 
+4. Normalizes units for downstream comparison 
+5. Signals quality with confidence scores 
+6. Audits everything for compliance 
+The extractor is now a neutral, high-fidelity intake valve that feeds your pipeline with rich, well-annotated 
+content—exactly what a medical RAG system needs. 
+ 

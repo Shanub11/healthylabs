@@ -1,9 +1,8 @@
 import { NextResponse, NextRequest } from 'next/server';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-// fs cannot be used for persistent storage on Vercel
-import fs from 'fs/promises';
-import path from 'path';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,13 +51,26 @@ export async function GET(request: NextRequest) {
     }
     
     // 4. Save the data
-    // NOTE: Writing to 'public/' does not persist on Vercel.
-    // You should insert 'hospitals' into your Supabase database here.
-    const filePath = path.join(process.cwd(), 'public', 'hospital_data.json');
-    await fs.writeFile(filePath, JSON.stringify({
-      lastScraped: new Date().toISOString(),
-      hospitals: hospitals
-    }, null, 2));
+    // Insert 'hospitals' into your Supabase database
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() { return cookieStore.getAll() },
+          setAll() {},
+        },
+      }
+    );
+
+    const { error: dbError } = await supabase
+      .from('hospitals')
+      .upsert(hospitals); // Ensure your 'hospitals' table has a primary key or unique constraint setup in Supabase
+
+    if (dbError) {
+      throw new Error(`Database Error: ${dbError.message}`);
+    }
 
     return NextResponse.json({
       message: `Successfully scraped ${hospitals.length} hospitals.`,
