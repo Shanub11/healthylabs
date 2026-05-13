@@ -1,0 +1,272 @@
+HealthyLabs.AI Model & Retriever
+Phase 1: The Data Contract (What the Colleague Needs to Know)
+Before writing any retrieval logic, your colleague must understand exactly how the data
+is formatted in Neo4j based on your pipeline's code.
+1. The Vector Search Target (AtomicChunk) To do semantic search, the retriever must
+target the AtomicChunk nodes.
+• Target Property: a.embedding (This holds the BioLORD vector).
+• Return Properties: a.content (the text), a.tier (1, 2, or 3),
+a.authority_score (1.0, 0.7, 0.3), and a.document_id.
+• Cypher Vector Search Example for Colleague:
+Cypher
+CALL db.index.vector.queryNodes('atomic_chunk_embedding', 5,
+$query_embedding)
+YIELD node AS a, score
+MATCH (a)-[:PART_OF]->(c:ClinicalContext)-[:CHILD_OF]->(d:Document)
+RETURN a.content AS text, a.authority_score AS authority, d.doc_uid
+AS source_uid, score
+2. The Hard Facts Target (The Knowledge Graph) To check for dosage limits or patient
+history, the retriever must target the PRESCRIBED relationships created by
+kg_service.py.
+• Cypher Graph Query Example for Colleague:
+Cypher
+MATCH (d:Drug {name: $drug_name})-[r:PRESCRIBED]->(p:Patient {id:
+$patient_id})
+RETURN r.dosage AS dosage, r.frequency AS frequency, r.unit AS unit,
+r.authority
+Phase 2: Detailed Directory Structure & File Explanations
+Here is the exact repository structure for healthylabs-inference, tailored to your
+pipeline and strategy documents.
+The New Repository: healthylabs-inference
+Unlike your pipeline (which is a strict, linear data processor), the Inference Engine is a
+dynamic, looping reasoning engine. It will read from your Tri-Store databases (Neo4j
+Vectors, Neo4j Graph, PostgreSQL) and use LLMs to orchestrate the retrieval and
+answering process.
+1. Recommended Directory Structure
+Use a FastAPI framework to match your pipeline, ensuring seamless microservice
+communication.
+Plaintext
+healthylabs-inference/
+├── api/
+│ ├── routes.py # Exposes /v1/chat and /v1/chat/stream
+│ └── request_models.py # User query schema, chat history schema
+├── core/
+│ ├── llm_client.py # Wrapper for your LLM (OpenAI,
+Anthropic, or local)
+│ └── database_clients.py # Read-only connections to Neo4j and
+PostgreSQL
+├── orchestrator/
+│ ├── self_rag_router.py # The "Brain": Decides retrieval strategy
+│ ├── intent_guard.py # Classifies Emergency vs Research vs
+Educational
+│ └── reflection.py # Checks confidence thresholds (>= 85%)
+├── retrieval/
+│ ├── strategies/
+│ │ ├── direct.py # Standard vector search
+│ │ ├── hyde.py # Hypothetical Document Embeddings
+│ │ ├── multi_query.py # Paraphrasing and expanding
+│ │ └── decompose.py # Multi-step sequential querying
+│ ├── neo4j_search.py # Cypher queries hitting
+AtomicChunk.embedding
+│ └── kg_overrides.py # Cypher queries hitting Patient/Drug
+graph for hard facts
+├── synthesis/
+│ ├── conflict_resolver.py # Interfaces with your
+contradiction_engine logic
+│ └── response_builder.py # Crafts the final answer with strict
+citations
+└── tests/
+ └── evaluation/ # RAGAS and DeepEval automated metrics
+2. Component Strategy (Guided by your Documents)
+A. The Intent Guard (Safety First) Before any retrieval happens, every query must be
+classified. The intent_guard.py will inspect the user's prompt.
+• If the query is an Emergency (e.g., "I have sudden severe chest pain"), it shortcircuits the entire RAG process, outputs an immediate disclaimer, and redirects
+to medical professionals.
+B. The Self-RAG Router (The Traffic Cop) This is the core of your efficiency and
+intelligence. Instead of running a heavy pipeline on every query, an initial LLM call acts
+as a controller.
+• Simple Queries ("What is pneumonia?"): Routed to direct.py.
+• Vague Queries: Routed to hyde.py to generate a semantic expansion before
+retrieving.
+• Multi-Intent Queries ("Headache after pneumonia treatment"): Routed to
+decompose.py to split into "causes of headache" and "antibiotic side effects".
+C. The Retrieval Engine (Leveraging your claude-code pipeline) Because your
+pipeline successfully stored embeddings on AtomicChunk nodes and built a
+Knowledge Graph of Patient and Drug nodes, your retrieval phase is incredibly
+powerful.
+• Vector Search: neo4j_search.py will execute HNSW vector similarity
+searches against AtomicChunk.embedding to find context.
+• Graph Override: Before finalizing context, kg_overrides.py will check the
+Knowledge Graph. If the graph detects a strict medical contraindication
+regarding the query, it supersedes the vector results.
+D. Synthesis & Reflection (Catching Contradictions) You have already started
+building the contradiction_engine.py in your pipeline branch. In the inference repo,
+the conflict_resolver.py will use this logic.
+• When multiple AtomicChunk nodes are retrieved, it compares them. If sources
+disagree (e.g., dosage mismatches), it forms a "Contradiction Cluster".
+• The reflection.py module evaluates the retrieved context. If confidence is
+below the threshold (e.g., 85%), it loops back and asks the Router to try a
+different strategy (like Multi-Query).
+• Finally, response_builder.py drafts the response, explicitly explaining
+uncertainties if contradictions exist, and attaching precise citations linking back
+to the PostgreSQL metadata.
+api/ (The Application Gateway)
+• routes.py: Exposes the FastAPI endpoints (e.g., POST /v1/chat). This is
+where the user's raw query enters the system.
+• request_models.py: Defines the Pydantic schemas for incoming queries. It
+must capture the query_text, session_id, and patient_id (if applicable) so
+the graph database can contextualize the search.
+orchestrator/ (The "Brain" of the System)
+This folder houses the logic that prevents you from running heavy computations on
+simple queries.
+• intent_guard.py: Every query must be classified before processing. This
+module uses a fast, lightweight LLM prompt to classify the user's intent into:
+Emergency/Diagnostic, Research, or Educational.
+o Data Action: If classified as "Emergency", it triggers an immediate
+disclaimer, suppresses actionable advice, and redirects to a
+professional, bypassing retrieval entirely.
+• self_rag_router.py: The controller layer that sits above your retrieval
+modules. It inspects the query and outputs a strict JSON decision routing the
+request.
+o Output Format required from LLM: {"strategy": "direct" | "hyde"
+| "multi_query" | "decompose", "reason": "string"}.
+o Logic: If the query is vague, it routes to HYDE; if multi-intent, it routes to
+decomposition.
+• reflection.py: After the first retrieval pass, this module evaluates the
+retrieved chunks. If the confidence threshold is not met (e.g.,
+$<85\%$ relevance), it triggers a secondary retrieval loop (like multi-query)
+before answering.
+retrieval/ (The Data Fetchers)
+This folder executes the strategies dictated by the self_rag_router.py.
+• strategies/direct.py: Embeds the user's query and executes a standard
+KNN vector search against Neo4j.
+• strategies/hyde.py: Uses an LLM to generate a "fake" ideal medical
+document based on the user's prompt, embeds that fake document, and uses it
+to search the vector space.
+• strategies/decompose.py: Splits complex queries into sub-queries (e.g.,
+splitting "symptoms" from "drug side effects") and retrieves for each separately.
+• kg_overrides.py: CRITICAL MODULE. This executes queries against the
+Patient and Drug nodes. The overriding rule is: If the Knowledge Graph detects
+a contraindication, it strictly supersedes the vector-based retrieval.
+synthesis/ (The Answer Generators)
+This folder takes the raw Neo4j chunks, resolves conflicts, and generates the final, safe
+response.
+• conflict_resolver.py: Since medical sources often disagree, this module
+compares the top retrieved AtomicChunk nodes.
+o Logic: It groups discrepancies (like dosage mismatches) into a
+"Contradiction Cluster". It uses the authority_score attached to the
+chunks to determine the heavier weight (e.g., a 1.0 FDA guideline beats a
+0.3 blog).
+• response_builder.py: The final LLM call. It takes the user query, the resolved
+context, and the contradiction clusters.
+o Rule: If conflicts exist, the response must become cautious, explicitly
+explain the uncertainty, and hedge the advice rather than hiding the
+contradiction.
+o Traceability: It maps the d.doc_uid from Neo4j to the PostgreSQL
+database to append formal citations to the response, ensuring every
+answer is fully auditable.
+1. The Missing SQL Contract (PostgreSQL)
+In the last breakdown, we covered the Neo4j Graph and Vectors. But
+response_builder.py needs to fetch the source metadata from PostgreSQL to
+generate citations. Because they cannot see core/models.py in your pipeline, they do
+not know what tables exist.
+Give them this exact SQL mapping: They will need to query a table (likely mapped by
+SQLAlchemy) that represents your MedicalDocumentSchema. Tell them to expect
+these exact columns to retrieve citation data:
+• document_id (String): The immutable primary key.
+• doc_uid (String): The stable human-readable ID (this maps directly to the
+d.doc_uid in Neo4j).
+• title (String): The document's title for the citation.
+• source (String): The publisher or URL.
+• source_tier (Integer): 1 (Canonical), 2 (Evidence), or 3 (Exploratory).
+• authority_score (Float): 1.0, 0.7, or 0.3.
+The Colleague's Task: When the Neo4j vector search returns chunk xyz from
+doc_uid: 123, they must query PostgreSQL WHERE doc_uid = '123' to fetch the
+title and source to append to the LLM's final answer.
+2. The Explicit API Contract
+If they don't know what the frontend website is going to send them, they cannot build
+the FastAPI routes. Give them this exact JSON contract so they know what to build
+api/routes.py around.
+Incoming Request (From the Website to Inference API):
+JSON
+{
+ "query_text": "Why does my father have a headache after his
+pneumonia antibiotics?",
+ "session_id": "uuid-1234",
+ "patient_id": "patient-789",
+ "chat_history": [
+ {"role": "user", "content": "He was diagnosed yesterday."},
+ {"role": "assistant", "content": "Understood. What medication is
+he taking?"}
+ ]
+}
+(Note: Passing patient_id is critical so kg_overrides.py can query the Knowledge
+Graph for that specific patient's drug contraindications).
+Outgoing Response (From Inference API to Website):
+JSON
+{
+ "answer": "Headache is a common side effect of [Antibiotic X].
+However, because he was recently treated for pneumonia, it could
+also be a symptom of residual infection. [1]",
+ "strategy_used": "query_decomposition",
+ "contradictions_found": false,
+ "citations": [
+ {
+ "ref_id": "[1]",
+ "title": "Antibiotic Adverse Effects",
+ "source": "FDA Clinical Guidelines",
+ "authority_score": 1.0
+ }
+ ]
+}
+The patient data (his medications and medical history), will be provided by the
+front end, as the part of the query.
+Here is exactly how this changes the Inference Engine design for your colleague,
+ensuring there are no data formatting errors.
+1. The Updated API Contract (What the Frontend Sends)
+Your colleague needs to update api/request_models.py to expect a rich, structured
+patient_context object alongside the query.
+Give this exact JSON payload to your frontend team and your backend colleague:
+JSON
+{
+ "query_text": "Can I take ibuprofen for my headache?",
+ "session_id": "uuid-1234",
+ "patient_context": {
+ "age": 65,
+ "gender": "male",
+ "current_medications": [
+ {"name": "Lisinopril", "dosage": "10mg", "frequency":
+"daily"},
+ {"name": "Metformin", "dosage": "500mg", "frequency": "twice
+daily"}
+ ],
+ "known_conditions": ["Hypertension", "Type 2 Diabetes"],
+ "allergies": ["Penicillin"]
+ },
+ "chat_history": []
+}
+2. How This Changes the Inference Code
+Since the patient data is handed to the backend on a silver platter, your colleague's job
+in the healthylabs-inference repo actually becomes cleaner, but the logic shifts
+slightly.
+A. orchestrator/self_rag_router.py (The Brain)
+When the LLM decides on a retrieval strategy, it now has instant access to the patient's
+context.
+• The Change: The router will embed the user's query_text alongside their
+known_conditions. For example, instead of just searching Neo4j for "ibuprofen
+side effects", the router will intelligently expand the query to search Neo4j for:
+"Ibuprofen side effects AND contraindications for Hypertension AND interaction
+with Lisinopril."
+B. retrieval/kg_overrides.py (The Safety Net)
+Previously, we assumed this module would have to hunt down the patient in the
+database. Now, it uses the frontend data to perform Targeted Graph Lookups.
+• The Change: If your Knowledge Graph (Neo4j) contains general medical facts
+(like Drug-Drug interactions or Drug-Condition contraindications), your
+colleague will write Cypher queries that take the frontend array
+(["Lisinopril", "Ibuprofen"]) and ask the graph: "Do any of these drugs
+conflict with each other?"
+• Cypher Example for Colleague:
+Cypher
+// Check if the requested drug (Ibuprofen) interacts with any of the
+frontend-provided medications
+UNWIND $frontend_medications AS current_med
+MATCH (d1:Drug {name: 'Ibuprofen'})-[r:INTERACTS_WITH]->(d2:Drug
+{name: current_med.name})
+RETURN d1.name, d2.name, r.severity, r.description
+C. synthesis/conflict_resolver.py (The Final Guard)
+This is where the magic happens. The resolver will take the vectors retrieved from Neo4j
+(the medical guidelines) and lay them over the frontend's patient_context.
+• The Logic: If a retrieved AtomicChunk from a clinical guideline says "First-line
+treatment is NSAIDs," the resolver will check the patient_context, see the
+"known_conditions": ["Hypertension"], and the LLM will generate a
+contradiction flag because NSAIDs can elevate blood pressure.

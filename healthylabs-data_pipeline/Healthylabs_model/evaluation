@@ -1,0 +1,132 @@
+Stepwise approach (pipeline + evaluation)
+Below is a clear, ordered checklist you can paste into your report or use as your
+implementation plan. I split it into Pipeline steps (what runs at inference) and
+Evaluation / validation steps (what you run during development & before deployment).
+Pipeline steps (inference / runtime)
+1. Receive user query
+o Record metadata (timestamp, user id if applicable, session context).
+2. Self-RAG controller: initial assessment
+o LLM inspects the raw query and decides which sub-pipeline(s) to run:
+direct retrieval, HYDE, multi-query retrieval, query decomposition, or
+some combination.
+o Also decides confidence thresholds and allowed cost budget for this
+request.
+3. If query is vague → HYDE
+o Use LLM to generate a rich hypothetical document (semantic expansion)
+that captures intended meaning.
+o Embed the HYDE document and use it as a retrieval query.
+4. If query could have multiple interpretations → Multi-Query Retrieval
+o Generate several paraphrases/alternate queries (cover synonyms, layman
+vs. clinical language, common misspellings).
+o Embed each paraphrase and perform retrieval for each.
+5. If query is multi-step / multi-intent → Query Decomposition
+o Split into sequential sub-questions (e.g., symptoms → causes; drug A
+interactions → dosing).
+o For each sub-question: retrieve + (optionally) answer; keep intermediate
+results for synthesis.
+6. If query is straightforward → Direct retrieval
+o Embed original query and retrieve top-k documents (sparse/dense
+retriever depending on design).
+7. Aggregate retrieved documents into a Document Pool
+o Merge and deduplicate results from HYDE, multi-query, decomposition,
+and direct retrieval.
+o Keep provenance metadata (source url/id, retrieval score, which subquery produced it).
+8. Re-ranking / precision filtering
+o Run a stronger re-ranker (cross-encoder / domain-adapted model) to
+score and select the most relevant and reliable documents.
+o Optionally apply heuristics for authority (prioritize guidelines, PubMed,
+FDA, clinical reviews).
+9. Self-RAG reflection / iterative retrieval loop (optional)
+o The LLM inspects the top results and asks: “Is confidence sufficient?”
+o If not, trigger targeted extra retrieval (rerun with different paraphrase,
+expand context, or search a different collection).
+o Stop when a confidence threshold is met or budget is exhausted.
+10.Answer generation (RAG)
+o LLM synthesizes the final response grounded on re-ranked documents.
+o Provide explicit citations and provenance snippets for each assertion
+(quote or paraphrase + source).
+11. Safety & clinical guardrails
+o Run safety filters: check for hallucinated claims, disallowed medical
+advice words, and ensure disclaimers (e.g., “not a medical professional” /
+“see your doctor”) where appropriate.
+o If high-risk or low-confidence, escalate to a human-in-the-loop flag.
+12.Return response + logging
+o Return answer + cited sources + confidence score and optionally a short
+explanation of why certain sources were chosen.
+o Log retrieval IDs, re-ranker scores, LLM reasoning trace (for auditing).
+Evaluation & validation steps (development + pre-deployment)
+1. Define evaluation goals & datasets
+o Create/collect: held-out test set (medical QAs), development set, and a
+human-eval set.
+o Include diverse query types: vague lay queries, technical clinician
+queries, multi-intent, and adversarial/noisy queries.
+o Include gold annotations (correct answers and relevant documents).
+2. Automatic retrieval + end-to-end metrics (use RAGAS)
+o Run RAGAS (or equivalent RAG-specific framework) to evaluate percomponent and end-to-end:
+▪ Retriever recall@k, precision@k, MRR.
+▪ Faithfulness / grounding rate (percent of claims supported by
+retrieved docs).
+▪ Generation relevance and answer correctness.
+▪ Noise ratio / irrelevant content rate.
+o Use RAGAS outputs to find weak components (bad retriever, poor reranker, generator hallucination).
+3. LLM/evaluator based checks (DeepEval / Grouse)
+o Run general LLM evaluators to measure fluency, coherence, and
+toxicity/bias.
+o Use these to ensure output readability and non-harmful phrasing.
+4. Task-specific benchmark tests (Med QA datasets)
+o Evaluate on medical benchmarks such as MedQA / PubMedQA / other
+clinically-relevant partitions to measure accuracy / EM / F1 where
+applicable.
+5. Human expert evaluation (clinical review)
+o Have clinicians or domain experts rate outputs for: clinical correctness,
+safety, clarity, and actionability.
+o Use a rubric (e.g., correct/partially correct/incorrect, harmful/benign).
+o Calculate inter-annotator agreement to validate rubric reliability.
+6. Hallucination & faithfulness analysis
+o Measure hallucination rate (claims not present in retrieved docs).
+o For high-impact errors, trace which pipeline stage introduced the error
+(retrieval vs. re-ranking vs. generation).
+7. Ablation studies
+o Turn components on/off to quantify their value: HYDE vs. no HYDE, multiquery vs. single query, with/without re-ranking, Self-RAG controller vs.
+always-run-full-pipeline.
+o Report delta in both accuracy and cost.
+8. Robustness & adversarial tests
+o Test with noisy input (typos, mixed languages), ambiguous phrasing, and
+intentional adversarial queries.
+o Ensure confidence calibration and safe failures.
+9. Human-in-the-loop simulations
+o Simulate scenarios where the system escalates to a clinician. Measure
+false positives/negatives of escalation flags.
+10. Operational metrics & monitoring plan
+o Define production KPIs: latency, throughput, cost per request, grounding
+rate, user-reported accuracy, escalation rate.
+o Set alerts for regressions (sudden drop in grounding rate or spike in
+hallucinations).
+11.Bias & safety audit
+o Run specialized checks for demographic bias, harmful instructions, and
+regulatory compliance.
+o Document limitations and explicit failure modes.
+12. Continuous evaluation + feedback loop
+o Periodically (weekly/monthly) re-evaluate on fresh queries, retrain
+reranker/embeddings if drift observed.
+o Use logged user feedback and clinician corrections to update index and
+models.
+Metrics to report (recommended)
+• Retriever: Recall@k, MRR, Precision@k
+• Re-ranker: NDCG, Precision@k
+• End-to-end: Accuracy / EM / F1 (on QA), Faithfulness / Grounding rate,
+Hallucination rate
+• Human eval: % clinically correct, safety score, clarity score, inter-annotator
+agreement (κ)
+• Operational: Latency, Cost per query, Escalation rate
+Quick implementation checklist (what to deliver)
+• System diagram (pipeline with Self-RAG controller)
+• Dataset splits + gold annotations + human evaluation rubric
+• Retriever (sparse/dense) + vector DB + chunking strategy
+• HYDE generator configuration & safety prompts
+• Paraphrase generator (multi-query) logic
+• Decomposition module & orchestration code
+• Re-ranker model + authority heuristics
+• RAGAS evaluation harness + scripts for DeepEval/Grouse
+• Human evaluation run & report (clinician ratings)
+• Monitoring dashboard & alert rules

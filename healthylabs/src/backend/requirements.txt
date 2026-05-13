@@ -1,0 +1,11 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+fastapi
+uvicorn
+python-multipart
+pypdf
+pillow
+python-dotenv
+pymongo
+requests
+easyocr
+certifi

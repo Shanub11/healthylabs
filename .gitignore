@@ -1,0 +1,34 @@
+# Secrets and local environment
+.env
+.env.*
+*.pem
+*service-account*.json
+healthylabs-*.json
+
+# Dependency folders
+node_modules/
+venv/
+.venv/
+
+# Build and cache output
+.next/
+out/
+build/
+dist/
+coverage/
+__pycache__/
+*.py[cod]
+*.tsbuildinfo
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Local databases and logs
+*.sqlite3
+*.db
+*.log
+
+# Backups of nested Git repositories preserved while creating the root repo
+.git-nested-backup/

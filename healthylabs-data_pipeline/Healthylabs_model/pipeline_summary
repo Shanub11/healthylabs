@@ -1,0 +1,118 @@
+HealthyLabs.AI Refinery Summary
+1. Phase 1: The Extractor Pipeline (extractor.py)
+The Extractor is an edge-side worker responsible for parsing raw medical documents,
+executing optical character recognition (OCR), and uploading visual assets.
+Core Logic:
+• Primary Engine: Uses pypdfium2 to parse high-fidelity text, bounding boxes,
+and layout graphs.
+• Fallback Engine: If pypdfium2 fails or hits unreadable text (0 text density), it
+triggers Tesseract OCR.
+• Asset Processing: Extracts images, tables, and diagrams, immediately pushing
+the visual assets to MinIO (S3) and retaining the MinIO URI.
+• Quality Guardrail: Calculates a holistic quality score based on text density and
+OCR confidence. If the score falls below the EXTRACTOR_QUALITY_THRESHOLD
+(currently 0.30), the document is flagged to prevent garbage data from polluting
+the graph.
+2. Phase 2: The Refinery API Gateway (main.py)
+The FastAPI endpoint (/refinery/v1/ingest) is the central orchestrator. It receives
+the JSON payload from the Extractor and enforces strict security and idempotency rules
+before persisting data.
+The Processing Gates:
+1. Idempotency Gatekeeper: Queries PostgreSQL to check if the document_id or
+content_hash already exists. If yes, it aborts silently (200 OK,
+decision="skipped_duplicate").
+2. Safety & PHI Engine: Scans the raw text for Protected Health Information (PHI).
+If the PHI density exceeds the PHI_CONFIDENCE_THRESHOLD (currently 0.20),
+the document status is forcibly changed to QUARANTINED.
+3. Relational Persistence: Writes the document metadata, audit logs, and table
+structures into PostgreSQL.
+4. Async Handoff: If the document survives all gates (Status = ACTIVE), the API
+returns a 200 OK to the Extractor and passes the payload to a background
+worker for chunking and embedding.
+3. Phase 3: Graph & Vector Generation (Background Task)
+This phase transforms the raw text into a hierarchical, semantically searchable format
+suitable for Retrieval-Augmented Generation (RAG).
+• Hierarchical Chunking: * L2 (ClinicalContext): Broad, document-level chunks
+that capture the surrounding narrative and section hierarchy.
+o L1 (AtomicChunk): Small, precise snippets of text derived directly from
+their parent L2 chunk.
+• Embedding Model: Uses BioLORD-2023. Every L1 Atomic Chunk is converted
+into a 768-dimensional dense vector float array.
+• Knowledge Graph (KG) Extraction: A secondary service (kg_service.py)
+scans the document for explicit medical entities (e.g., prescriptions, dosages)
+and creates explicit node relationships.
+4. Data Formats & Schemas
+A. The Wire Format (Pydantic Validation)
+This is the JSON payload the Extractor sends to the API. All arrays and sub-objects use
+default factories (Optional, [], or None) to prevent 422 Unprocessable Entity
+errors if a document is missing specific elements.
+JSON
+{
+ "document_id": "sha256_hash_string",
+ "content": "Raw extracted text...",
+ "source": "url_or_filepath",
+ "metadata": {
+ "title": "Optional[str]",
+ "published_at": "Optional[datetime]",
+ "tags": ["cardiology", "guidelines"]
+ },
+ "quality": {
+ "overall_score": 0.85,
+ "ocr_mean_confidence": 0.92,
+ "issues": []
+ },
+ "assets": [
+ {
+ "asset_id": "uuid",
+ "kind": "extracted_image",
+ "path": "s3://healthylabs-images/...",
+ "page": 12
+ }
+ ],
+ "tables": [],
+ "medical_patterns": []
+}
+B. PostgreSQL (Metadata & Provenance Layer)
+PostgreSQL acts as the source of truth for document state, auditing, and structured
+table data.
+• MedicalMetadata Table: Stores the document master record.
+o document_id (PK, String)
+o content_hash (String, Unique)
+o status (Enum: ACTIVE, QUARANTINED, DEPRECATED)
+o authority_score (Float)
+• MedicalMetadataAudit Table: An append-only ledger tracking every state
+change (e.g., why a document was quarantined for PHI or flagged for
+contradictions).
+• MedicalTable Table: Stores extracted tables as flat CSV strings for easy
+downstream parsing.
+• MedicalAsset Table: Maps asset UUIDs to their MinIO storage_path.
+C. MinIO (Object Storage)
+A local S3-compatible datastore.
+• Bucket: healthylabs-images
+• Contents: Raw .png or .jpg files extracted from the PDFs (diagrams, scans,
+DICOM renders). These are linked via the Neo4j graph and PostgreSQL via their
+S3 paths.
+D. Neo4j (Vector & Knowledge Graph Layer)
+This is the database the downstream model will query to perform RAG.
+1. The Vector Index An index named atomic_chunk_embedding sits on the
+embedding property of AtomicChunk nodes. It is configured for 768 dimensions using
+cosine similarity.
+2. The Graph Topology The model developer will traverse this structure to retrieve
+context:
+• (d:Document) Node:
+o Properties: document_id, doc_uid, updated_at
+• (c:ClinicalContext) Node [L2 Chunk]:
+o Properties: id, content (large text block), level (int: 2), metadata
+(Stringified JSON containing section headers and layout rules).
+o Relationship: (c)-[:CHILD_OF]->(d)
+• (a:AtomicChunk) Node [L1 Chunk]:
+o Properties: id, content (precise text snippet), embedding (List[Float],
+768-dim), tier, authority_score.
+o Relationship: (a)-[:PART_OF]->(c)
+Retrieval Strategy for the Model: When the model receives a user query, it should:
+1. Embed the user query using BioLORD-2023.
+2. Perform a vector similarity search against the AtomicChunk nodes.
+3. Once the top K AtomicChunk nodes are found, traverse the graph up (MATCH
+(a)-[:PART_OF]->(c:ClinicalContext)) to retrieve the surrounding L2
+context and stringified metadata, feeding that enriched context into the LLM
+prompt.
